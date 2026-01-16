@@ -270,7 +270,14 @@ export class EventRouter {
 				try {
 					await processRecord(record)
 				} catch {
-					failures.push(record.messageId)
+					// Stop on failure: mark this and all remaining records as failures
+					for (let j = i; j < event.Records.length; j++) {
+						const remaining = event.Records[j]
+						if (remaining) {
+							failures.push(remaining.messageId)
+						}
+					}
+					break
 				}
 			}
 		} else {
@@ -417,7 +424,14 @@ export class EventRouter {
 				try {
 					await processRecord(record)
 				} catch {
-					failures.push(record.eventID)
+					// Stop on failure: mark this and all remaining records as failures
+					for (let j = i; j < event.Records.length; j++) {
+						const remaining = event.Records[j]
+						if (remaining) {
+							failures.push(remaining.eventID)
+						}
+					}
+					break
 				}
 			}
 		} else {

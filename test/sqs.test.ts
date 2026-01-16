@@ -203,4 +203,37 @@ describe('SQS routing', () => {
 			'end-msg-2',
 		])
 	})
+
+	test('sequential stops on failure and marks remaining as failures', async () => {
+		const router = new EventRouter()
+		const processed: string[] = []
+
+		router.sqs({ queueName: 'fifo-queue', sequential: true }, (c) => {
+			const id = c.sqs.messageId
+			if (id === 'msg-2') {
+				throw new Error('Intentional failure')
+			}
+			processed.push(id)
+		})
+
+		const event = createSQSBatchEvent('fifo-queue', [
+			{ messageId: 'msg-1', body: {} },
+			{ messageId: 'msg-2', body: {} },
+			{ messageId: 'msg-3', body: {} },
+			{ messageId: 'msg-4', body: {} },
+		])
+		const result = await router.handler()(event, mockLambdaContext)
+
+		// Only msg-1 was processed before failure
+		expect(processed).toEqual(['msg-1'])
+
+		// msg-2 (failed) and msg-3, msg-4 (remaining) are all marked as failures
+		expect(result).toEqual({
+			batchItemFailures: [
+				{ itemIdentifier: 'msg-2' },
+				{ itemIdentifier: 'msg-3' },
+				{ itemIdentifier: 'msg-4' },
+			],
+		})
+	})
 })

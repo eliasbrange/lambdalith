@@ -133,4 +133,40 @@ describe('DynamoDB Streams routing', () => {
 			'end-evt-3',
 		])
 	})
+
+	test('sequential stops on failure and marks remaining as failures', async () => {
+		const router = new EventRouter()
+		const processed: string[] = []
+
+		router.dynamodb.insert(
+			{ tableName: 'orders-table', sequential: true },
+			(c) => {
+				const id = c.dynamodb.eventId
+				if (id === 'evt-2') {
+					throw new Error('Intentional failure')
+				}
+				processed.push(id)
+			},
+		)
+
+		const event = createDynamoDBBatchEvent('orders-table', 'INSERT', [
+			{ eventId: 'evt-1', keys: { pk: { S: '1' } } },
+			{ eventId: 'evt-2', keys: { pk: { S: '2' } } },
+			{ eventId: 'evt-3', keys: { pk: { S: '3' } } },
+			{ eventId: 'evt-4', keys: { pk: { S: '4' } } },
+		])
+		const result = await router.handler()(event, mockLambdaContext)
+
+		// Only evt-1 was processed before failure
+		expect(processed).toEqual(['evt-1'])
+
+		// evt-2 (failed) and evt-3, evt-4 (remaining) are all marked as failures
+		expect(result).toEqual({
+			batchItemFailures: [
+				{ itemIdentifier: 'evt-2' },
+				{ itemIdentifier: 'evt-3' },
+				{ itemIdentifier: 'evt-4' },
+			],
+		})
+	})
 })
