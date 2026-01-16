@@ -34,7 +34,7 @@
 	"scripts": {
 		"build": "bunup",
 		"dev": "bunup --watch",
-		"postinstall": "bun simple-git-hooks",
+		"prepare": "bun simple-git-hooks",
 		"lint": "biome check .",
 		"lint:fix": "biome check --write .",
 		"release": "bumpp --commit --push --tag",
@@ -60,6 +60,6 @@
 		}
 	},
 	"simple-git-hooks": {
-		"pre-commit": "bun run lint && bun run type-check"
+		"pre-commit": "bun run lint && bun run typecheck"
 	}
 }
