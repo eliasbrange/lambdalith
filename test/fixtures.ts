@@ -1,4 +1,11 @@
-import type { LambdaContext, SQSEvent } from '../src'
+import type {
+	AttributeValue,
+	DynamoDBStreamEvent,
+	EventBridgeEvent,
+	LambdaContext,
+	SNSEvent,
+	SQSEvent,
+} from '../src'
 
 // Mock Lambda context
 export const mockLambdaContext: LambdaContext = {
@@ -45,7 +52,7 @@ export function createSNSEvent(
 	topicName: string,
 	messageId: string,
 	body: unknown,
-) {
+): SNSEvent {
 	return {
 		Records: [
 			{
@@ -74,7 +81,7 @@ export function createEventBridgeEvent(
 	source: string,
 	detailType: string,
 	detail: unknown,
-) {
+): EventBridgeEvent {
 	return {
 		version: '0',
 		id: 'test-event-id',
@@ -91,9 +98,9 @@ export function createEventBridgeEvent(
 export function createDynamoDBEvent(
 	tableName: string,
 	eventName: 'INSERT' | 'MODIFY' | 'REMOVE',
-	keys: Record<string, { S?: string; N?: string }>,
-	newImage?: Record<string, { S?: string; N?: string }>,
-) {
+	keys: Record<string, AttributeValue>,
+	newImage?: Record<string, AttributeValue>,
+): DynamoDBStreamEvent {
 	return {
 		Records: [
 			{
