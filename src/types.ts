@@ -115,11 +115,13 @@ export type ErrorHandler = (
 
 // Match option types
 export interface SQSMatchOptions {
-	queueName: string
+	queueName?: string
+	sequential?: boolean
 }
 
 export interface SNSMatchOptions {
-	topicName: string
+	topicName?: string
+	sequential?: boolean
 }
 
 export interface EventBridgeMatchOptions {
@@ -130,10 +132,12 @@ export interface EventBridgeMatchOptions {
 export interface DynamoDBMatchOptions {
 	tableName?: string
 	eventName?: 'INSERT' | 'MODIFY' | 'REMOVE'
+	sequential?: boolean
 }
 
 export interface DynamoDBTableOptions {
 	tableName: string
+	sequential?: boolean
 }
 
 // Route types

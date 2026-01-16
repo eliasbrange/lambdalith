@@ -141,7 +141,11 @@ export class EventRouter {
 				})
 			} else if (handler) {
 				this.dynamodbRoutes.push({
-					options: { tableName: optionsOrHandler.tableName, eventName },
+					options: {
+						tableName: optionsOrHandler.tableName,
+						eventName,
+						sequential: optionsOrHandler.sequential,
+					},
 					handler,
 				})
 			}
@@ -227,38 +231,60 @@ export class EventRouter {
 	): Promise<SQSBatchResponse> {
 		const failures: string[] = []
 
-		const results = await Promise.allSettled(
-			event.Records.map(async (record) => {
-				const queue = parseQueueName(record.eventSourceARN)
-				const handler = this.matchSQSHandler(queue)
+		// Determine if sequential processing is needed from first record's route
+		const firstRecord = event.Records[0]
+		const firstQueue = firstRecord
+			? parseQueueName(firstRecord.eventSourceARN)
+			: ''
+		const firstRoute = this.matchSQSRoute(firstQueue)
+		const isSequential = firstRoute?.options?.sequential === true
 
-				if (!handler) {
-					if (this.notFoundHandler) {
-						const ctx = createNotFoundContext('sqs', record, lambdaContext)
-						await this.notFoundHandler(ctx)
-					}
-					return
+		const processRecord = async (record: (typeof event.Records)[0]) => {
+			const queue = parseQueueName(record.eventSourceARN)
+			const route = this.matchSQSRoute(queue)
+
+			if (!route) {
+				if (this.notFoundHandler) {
+					const ctx = createNotFoundContext('sqs', record, lambdaContext)
+					await this.notFoundHandler(ctx)
 				}
+				return
+			}
 
-				try {
-					const ctx = createSQSContext(record, lambdaContext)
-					await handler(ctx)
-				} catch (error) {
-					if (this.errorHandler) {
-						const ctx = createErrorContext('sqs', record, lambdaContext)
-						await this.errorHandler(error as Error, ctx)
-					}
-					throw error
+			try {
+				const ctx = createSQSContext(record, lambdaContext)
+				await route.handler(ctx)
+			} catch (error) {
+				if (this.errorHandler) {
+					const ctx = createErrorContext('sqs', record, lambdaContext)
+					await this.errorHandler(error as Error, ctx)
 				}
-			}),
-		)
+				throw error
+			}
+		}
 
-		for (let i = 0; i < results.length; i++) {
-			const result = results[i]
-			if (result?.status === 'rejected') {
+		if (isSequential) {
+			for (let i = 0; i < event.Records.length; i++) {
 				const record = event.Records[i]
-				if (record) {
+				if (!record) continue
+				try {
+					await processRecord(record)
+				} catch {
 					failures.push(record.messageId)
+				}
+			}
+		} else {
+			const results = await Promise.allSettled(
+				event.Records.map((record) => processRecord(record)),
+			)
+
+			for (let i = 0; i < results.length; i++) {
+				const result = results[i]
+				if (result?.status === 'rejected') {
+					const record = event.Records[i]
+					if (record) {
+						failures.push(record.messageId)
+					}
 				}
 			}
 		}
@@ -272,32 +298,48 @@ export class EventRouter {
 		event: SNSEvent,
 		lambdaContext: LambdaContext,
 	): Promise<void> {
-		await Promise.allSettled(
-			event.Records.map(async (record) => {
-				const topic = parseTopicName(record.Sns.TopicArn)
-				const handler = this.matchSNSHandler(topic)
+		// Determine if sequential processing is needed from first record's route
+		const firstRecord = event.Records[0]
+		const firstTopic = firstRecord
+			? parseTopicName(firstRecord.Sns.TopicArn)
+			: ''
+		const firstRoute = this.matchSNSRoute(firstTopic)
+		const isSequential = firstRoute?.options?.sequential === true
 
-				if (!handler) {
-					if (this.notFoundHandler) {
-						const ctx = createNotFoundContext('sns', record, lambdaContext)
-						await this.notFoundHandler(ctx)
-					}
-					return
-				}
+		const processRecord = async (record: (typeof event.Records)[0]) => {
+			const topic = parseTopicName(record.Sns.TopicArn)
+			const route = this.matchSNSRoute(topic)
 
-				try {
-					const ctx = createSNSContext(record, lambdaContext)
-					await handler(ctx)
-				} catch (error) {
-					if (this.errorHandler) {
-						const ctx = createErrorContext('sns', record, lambdaContext)
-						await this.errorHandler(error as Error, ctx)
-					}
-					// SNS doesn't support partial batch failures, so we just log
-					throw error
+			if (!route) {
+				if (this.notFoundHandler) {
+					const ctx = createNotFoundContext('sns', record, lambdaContext)
+					await this.notFoundHandler(ctx)
 				}
-			}),
-		)
+				return
+			}
+
+			try {
+				const ctx = createSNSContext(record, lambdaContext)
+				await route.handler(ctx)
+			} catch (error) {
+				if (this.errorHandler) {
+					const ctx = createErrorContext('sns', record, lambdaContext)
+					await this.errorHandler(error as Error, ctx)
+				}
+				// SNS doesn't support partial batch failures, so we just log
+				throw error
+			}
+		}
+
+		if (isSequential) {
+			for (const record of event.Records) {
+				await processRecord(record)
+			}
+		} else {
+			await Promise.allSettled(
+				event.Records.map((record) => processRecord(record)),
+			)
+		}
 	}
 
 	private async handleEventBridge(
@@ -334,39 +376,62 @@ export class EventRouter {
 	): Promise<SQSBatchResponse> {
 		const failures: string[] = []
 
-		const results = await Promise.allSettled(
-			event.Records.map(async (record) => {
-				const table = parseTableName(record.eventSourceARN)
-				const eventName = record.eventName
-				const handler = this.matchDynamoDBHandler(table, eventName)
+		// Determine if sequential processing is needed from first record's route
+		const firstRecord = event.Records[0]
+		const firstTable = firstRecord
+			? parseTableName(firstRecord.eventSourceARN)
+			: ''
+		const firstEventName = firstRecord?.eventName ?? ''
+		const firstRoute = this.matchDynamoDBRoute(firstTable, firstEventName)
+		const isSequential = firstRoute?.options?.sequential === true
 
-				if (!handler) {
-					if (this.notFoundHandler) {
-						const ctx = createNotFoundContext('dynamodb', record, lambdaContext)
-						await this.notFoundHandler(ctx)
-					}
-					return
+		const processRecord = async (record: (typeof event.Records)[0]) => {
+			const table = parseTableName(record.eventSourceARN)
+			const eventName = record.eventName
+			const route = this.matchDynamoDBRoute(table, eventName)
+
+			if (!route) {
+				if (this.notFoundHandler) {
+					const ctx = createNotFoundContext('dynamodb', record, lambdaContext)
+					await this.notFoundHandler(ctx)
 				}
+				return
+			}
 
-				try {
-					const ctx = createDynamoDBContext(record, lambdaContext)
-					await handler(ctx)
-				} catch (error) {
-					if (this.errorHandler) {
-						const ctx = createErrorContext('dynamodb', record, lambdaContext)
-						await this.errorHandler(error as Error, ctx)
-					}
-					throw error
+			try {
+				const ctx = createDynamoDBContext(record, lambdaContext)
+				await route.handler(ctx)
+			} catch (error) {
+				if (this.errorHandler) {
+					const ctx = createErrorContext('dynamodb', record, lambdaContext)
+					await this.errorHandler(error as Error, ctx)
 				}
-			}),
-		)
+				throw error
+			}
+		}
 
-		for (let i = 0; i < results.length; i++) {
-			const result = results[i]
-			if (result?.status === 'rejected') {
+		if (isSequential) {
+			for (let i = 0; i < event.Records.length; i++) {
 				const record = event.Records[i]
-				if (record) {
+				if (!record) continue
+				try {
+					await processRecord(record)
+				} catch {
 					failures.push(record.eventID)
+				}
+			}
+		} else {
+			const results = await Promise.allSettled(
+				event.Records.map((record) => processRecord(record)),
+			)
+
+			for (let i = 0; i < results.length; i++) {
+				const result = results[i]
+				if (result?.status === 'rejected') {
+					const record = event.Records[i]
+					if (record) {
+						failures.push(record.eventID)
+					}
 				}
 			}
 		}
@@ -378,19 +443,31 @@ export class EventRouter {
 
 	// Matching methods (first match wins)
 
-	private matchSQSHandler(queue: string): SQSHandler | undefined {
+	private matchSQSRoute(
+		queue: string,
+	): Route<SQSHandler, SQSMatchOptions | undefined> | undefined {
 		for (const route of this.sqsRoutes) {
-			if (!route.options || route.options.queueName === queue) {
-				return route.handler
+			if (
+				!route.options ||
+				!route.options.queueName ||
+				route.options.queueName === queue
+			) {
+				return route
 			}
 		}
 		return undefined
 	}
 
-	private matchSNSHandler(topic: string): SNSHandler | undefined {
+	private matchSNSRoute(
+		topic: string,
+	): Route<SNSHandler, SNSMatchOptions | undefined> | undefined {
 		for (const route of this.snsRoutes) {
-			if (!route.options || route.options.topicName === topic) {
-				return route.handler
+			if (
+				!route.options ||
+				!route.options.topicName ||
+				route.options.topicName === topic
+			) {
+				return route
 			}
 		}
 		return undefined
@@ -415,20 +492,20 @@ export class EventRouter {
 		return undefined
 	}
 
-	private matchDynamoDBHandler(
+	private matchDynamoDBRoute(
 		table: string,
 		eventName: string,
-	): DynamoDBHandler | undefined {
+	): Route<DynamoDBHandler, DynamoDBMatchOptions | undefined> | undefined {
 		for (const route of this.dynamodbRoutes) {
 			if (!route.options) {
-				return route.handler
+				return route
 			}
 			const tableMatch =
 				!route.options.tableName || route.options.tableName === table
 			const eventNameMatch =
 				!route.options.eventName || route.options.eventName === eventName
 			if (tableMatch && eventNameMatch) {
-				return route.handler
+				return route
 			}
 		}
 		return undefined

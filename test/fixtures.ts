@@ -21,35 +21,52 @@ export const mockLambdaContext: LambdaContext = {
 }
 
 // Test fixtures
+export function createSQSRecord(
+	queueName: string,
+	messageId: string,
+	body: unknown,
+): SQSEvent['Records'][0] {
+	return {
+		messageId,
+		receiptHandle: 'test-receipt',
+		body: JSON.stringify(body),
+		attributes: {
+			ApproximateReceiveCount: '1',
+			SentTimestamp: '1234567890000',
+			SenderId: 'test-sender',
+			ApproximateFirstReceiveTimestamp: '1234567890000',
+		},
+		messageAttributes: {
+			myAttribute: {
+				dataType: 'String',
+				stringValue: 'value',
+			},
+		},
+		md5OfBody: 'test-md5',
+		eventSource: 'aws:sqs',
+		eventSourceARN: `arn:aws:sqs:us-east-1:123456789:${queueName}`,
+		awsRegion: 'us-east-1',
+	}
+}
+
 export function createSQSEvent(
 	queueName: string,
 	messageId: string,
 	body: unknown,
 ): SQSEvent {
 	return {
-		Records: [
-			{
-				messageId,
-				receiptHandle: 'test-receipt',
-				body: JSON.stringify(body),
-				attributes: {
-					ApproximateReceiveCount: '1',
-					SentTimestamp: '1234567890000',
-					SenderId: 'test-sender',
-					ApproximateFirstReceiveTimestamp: '1234567890000',
-				},
-				messageAttributes: {
-					myAttribute: {
-						dataType: 'String',
-						stringValue: 'value',
-					},
-				},
-				md5OfBody: 'test-md5',
-				eventSource: 'aws:sqs',
-				eventSourceARN: `arn:aws:sqs:us-east-1:123456789:${queueName}`,
-				awsRegion: 'us-east-1',
-			},
-		],
+		Records: [createSQSRecord(queueName, messageId, body)],
+	}
+}
+
+export function createSQSBatchEvent(
+	queueName: string,
+	messages: Array<{ messageId: string; body: unknown }>,
+): SQSEvent {
+	return {
+		Records: messages.map((m) =>
+			createSQSRecord(queueName, m.messageId, m.body),
+		),
 	}
 }
 
@@ -100,6 +117,30 @@ export function createEventBridgeEvent(
 	}
 }
 
+export function createDynamoDBRecord(
+	tableName: string,
+	eventName: 'INSERT' | 'MODIFY' | 'REMOVE',
+	eventId: string,
+	keys: Record<string, AttributeValue>,
+	newImage?: Record<string, AttributeValue>,
+): DynamoDBStreamEvent['Records'][0] {
+	return {
+		eventID: eventId,
+		eventVersion: '1.1',
+		dynamodb: {
+			Keys: keys,
+			NewImage: newImage,
+			SequenceNumber: '123',
+			SizeBytes: 100,
+			StreamViewType: 'NEW_AND_OLD_IMAGES' as const,
+		},
+		awsRegion: 'us-east-1',
+		eventName,
+		eventSourceARN: `arn:aws:dynamodb:us-east-1:123456789:table/${tableName}/stream/2024-01-01`,
+		eventSource: 'aws:dynamodb' as const,
+	}
+}
+
 export function createDynamoDBEvent(
 	tableName: string,
 	eventName: 'INSERT' | 'MODIFY' | 'REMOVE',
@@ -108,21 +149,25 @@ export function createDynamoDBEvent(
 ): DynamoDBStreamEvent {
 	return {
 		Records: [
-			{
-				eventID: 'test-event-id',
-				eventVersion: '1.1',
-				dynamodb: {
-					Keys: keys,
-					NewImage: newImage,
-					SequenceNumber: '123',
-					SizeBytes: 100,
-					StreamViewType: 'NEW_AND_OLD_IMAGES' as const,
-				},
-				awsRegion: 'us-east-1',
+			createDynamoDBRecord(
+				tableName,
 				eventName,
-				eventSourceARN: `arn:aws:dynamodb:us-east-1:123456789:table/${tableName}/stream/2024-01-01`,
-				eventSource: 'aws:dynamodb' as const,
-			},
+				'test-event-id',
+				keys,
+				newImage,
+			),
 		],
+	}
+}
+
+export function createDynamoDBBatchEvent(
+	tableName: string,
+	eventName: 'INSERT' | 'MODIFY' | 'REMOVE',
+	records: Array<{ eventId: string; keys: Record<string, AttributeValue> }>,
+): DynamoDBStreamEvent {
+	return {
+		Records: records.map((r) =>
+			createDynamoDBRecord(tableName, eventName, r.eventId, r.keys),
+		),
 	}
 }

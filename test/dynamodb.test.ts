@@ -1,6 +1,10 @@
 import { describe, expect, mock, test } from 'bun:test'
 import { EventRouter } from '../src'
-import { createDynamoDBEvent, mockLambdaContext } from './fixtures'
+import {
+	createDynamoDBBatchEvent,
+	createDynamoDBEvent,
+	mockLambdaContext,
+} from './fixtures'
 
 describe('DynamoDB Streams routing', () => {
 	test('routes to insert with table match', async () => {
@@ -97,5 +101,36 @@ describe('DynamoDB Streams routing', () => {
 			pk: 'order-123',
 			sk: 42,
 		})
+	})
+
+	test('sequential: true processes records in order', async () => {
+		const router = new EventRouter()
+		const order: string[] = []
+
+		router.dynamodb.insert(
+			{ tableName: 'orders-table', sequential: true },
+			async (c) => {
+				const id = c.dynamodb.eventId
+				order.push(`start-${id}`)
+				await new Promise((r) => setTimeout(r, id === 'evt-1' ? 20 : 5))
+				order.push(`end-${id}`)
+			},
+		)
+
+		const event = createDynamoDBBatchEvent('orders-table', 'INSERT', [
+			{ eventId: 'evt-1', keys: { pk: { S: '1' } } },
+			{ eventId: 'evt-2', keys: { pk: { S: '2' } } },
+			{ eventId: 'evt-3', keys: { pk: { S: '3' } } },
+		])
+		await router.handler()(event, mockLambdaContext)
+
+		expect(order).toEqual([
+			'start-evt-1',
+			'end-evt-1',
+			'start-evt-2',
+			'end-evt-2',
+			'start-evt-3',
+			'end-evt-3',
+		])
 	})
 })
