@@ -113,9 +113,32 @@ export type ErrorHandler = (
 	c: ErrorContext,
 ) => void | Promise<void>
 
+// Match option types
+export interface SQSMatchOptions {
+	queueName: string
+}
+
+export interface SNSMatchOptions {
+	topicName: string
+}
+
+export interface EventBridgeMatchOptions {
+	source?: string
+	detailType?: string
+}
+
+export interface DynamoDBMatchOptions {
+	tableName?: string
+	eventName?: 'INSERT' | 'MODIFY' | 'REMOVE'
+}
+
+export interface DynamoDBTableOptions {
+	tableName: string
+}
+
 // Route types
-export interface Route<THandler> {
-	pattern: string
+export interface Route<THandler, TOptions = undefined> {
+	options: TOptions
 	handler: THandler
 }
 

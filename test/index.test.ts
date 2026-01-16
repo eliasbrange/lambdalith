@@ -119,7 +119,7 @@ describe('EventRouter', () => {
 			const router = new EventRouter()
 			const handler = mock(() => {})
 
-			router.sqs('orders-queue', handler)
+			router.sqs({ queueName: 'orders-queue' }, handler)
 
 			const event = createSQSEvent('orders-queue', 'msg-1', { orderId: '123' })
 			await router.handler()(event, mockLambdaContext)
@@ -127,38 +127,53 @@ describe('EventRouter', () => {
 			expect(handler).toHaveBeenCalledTimes(1)
 		})
 
-		test('routes to wildcard handler when no exact match', async () => {
+		test('routes to catch-all handler when no specific match', async () => {
 			const router = new EventRouter()
-			const wildcardHandler = mock(() => {})
+			const catchAllHandler = mock(() => {})
 
-			router.sqs('*', wildcardHandler)
+			router.sqs(catchAllHandler)
 
 			const event = createSQSEvent('any-queue', 'msg-1', { data: 'test' })
 			await router.handler()(event, mockLambdaContext)
 
-			expect(wildcardHandler).toHaveBeenCalledTimes(1)
+			expect(catchAllHandler).toHaveBeenCalledTimes(1)
 		})
 
-		test('exact match takes priority over wildcard', async () => {
+		test('first match wins (specific before catch-all)', async () => {
 			const router = new EventRouter()
-			const exactHandler = mock(() => {})
-			const wildcardHandler = mock(() => {})
+			const specificHandler = mock(() => {})
+			const catchAllHandler = mock(() => {})
 
-			router.sqs('*', wildcardHandler)
-			router.sqs('orders-queue', exactHandler)
+			router.sqs({ queueName: 'orders-queue' }, specificHandler)
+			router.sqs(catchAllHandler)
 
 			const event = createSQSEvent('orders-queue', 'msg-1', { orderId: '123' })
 			await router.handler()(event, mockLambdaContext)
 
-			expect(exactHandler).toHaveBeenCalledTimes(1)
-			expect(wildcardHandler).not.toHaveBeenCalled()
+			expect(specificHandler).toHaveBeenCalledTimes(1)
+			expect(catchAllHandler).not.toHaveBeenCalled()
+		})
+
+		test('first match wins (catch-all before specific)', async () => {
+			const router = new EventRouter()
+			const specificHandler = mock(() => {})
+			const catchAllHandler = mock(() => {})
+
+			router.sqs(catchAllHandler)
+			router.sqs({ queueName: 'orders-queue' }, specificHandler)
+
+			const event = createSQSEvent('orders-queue', 'msg-1', { orderId: '123' })
+			await router.handler()(event, mockLambdaContext)
+
+			expect(catchAllHandler).toHaveBeenCalledTimes(1)
+			expect(specificHandler).not.toHaveBeenCalled()
 		})
 
 		test('provides correct context properties', async () => {
 			const router = new EventRouter()
 			let capturedContext: unknown
 
-			router.sqs('orders-queue', (c) => {
+			router.sqs({ queueName: 'orders-queue' }, (c) => {
 				capturedContext = {
 					queue: c.sqs.queue,
 					body: c.sqs.body,
@@ -183,7 +198,7 @@ describe('EventRouter', () => {
 		test('returns batch item failures for failed records', async () => {
 			const router = new EventRouter()
 
-			router.sqs('orders-queue', () => {
+			router.sqs({ queueName: 'orders-queue' }, () => {
 				throw new Error('Processing failed')
 			})
 
@@ -199,7 +214,7 @@ describe('EventRouter', () => {
 			const router = new EventRouter()
 			let getValue: unknown
 
-			router.sqs('orders-queue', (c) => {
+			router.sqs({ queueName: 'orders-queue' }, (c) => {
 				c.set('traceId', 'trace-123')
 				getValue = c.get('traceId')
 			})
@@ -216,7 +231,7 @@ describe('EventRouter', () => {
 			const router = new EventRouter()
 			const handler = mock(() => {})
 
-			router.sns('notifications', handler)
+			router.sns({ topicName: 'notifications' }, handler)
 
 			const event = createSNSEvent('notifications', 'msg-1', { alert: 'test' })
 			await router.handler()(event, mockLambdaContext)
@@ -228,7 +243,7 @@ describe('EventRouter', () => {
 			const router = new EventRouter()
 			let capturedTopic: string | undefined
 
-			router.sns('notifications', (c) => {
+			router.sns({ topicName: 'notifications' }, (c) => {
 				capturedTopic = c.sns.topic
 			})
 
@@ -244,7 +259,10 @@ describe('EventRouter', () => {
 			const router = new EventRouter()
 			const handler = mock(() => {})
 
-			router.event('myapp.users/UserCreated', handler)
+			router.event(
+				{ source: 'myapp.users', detailType: 'UserCreated' },
+				handler,
+			)
 
 			const event = createEventBridgeEvent('myapp.users', 'UserCreated', {
 				userId: '123',
@@ -254,11 +272,11 @@ describe('EventRouter', () => {
 			expect(handler).toHaveBeenCalledTimes(1)
 		})
 
-		test('routes to partial match (source/*)', async () => {
+		test('routes to source-only match (all detail types)', async () => {
 			const router = new EventRouter()
 			const handler = mock(() => {})
 
-			router.event('myapp.users/*', handler)
+			router.event({ source: 'myapp.users' }, handler)
 
 			const event = createEventBridgeEvent('myapp.users', 'UserDeleted', {
 				userId: '123',
@@ -268,32 +286,56 @@ describe('EventRouter', () => {
 			expect(handler).toHaveBeenCalledTimes(1)
 		})
 
-		test('exact match takes priority over partial', async () => {
+		test('first match wins (specific before source-only)', async () => {
 			const router = new EventRouter()
 			const exactHandler = mock(() => {})
-			const partialHandler = mock(() => {})
+			const sourceOnlyHandler = mock(() => {})
 
-			router.event('myapp.users/*', partialHandler)
-			router.event('myapp.users/UserCreated', exactHandler)
+			router.event(
+				{ source: 'myapp.users', detailType: 'UserCreated' },
+				exactHandler,
+			)
+			router.event({ source: 'myapp.users' }, sourceOnlyHandler)
 
 			const event = createEventBridgeEvent('myapp.users', 'UserCreated', {})
 			await router.handler()(event, mockLambdaContext)
 
 			expect(exactHandler).toHaveBeenCalledTimes(1)
-			expect(partialHandler).not.toHaveBeenCalled()
+			expect(sourceOnlyHandler).not.toHaveBeenCalled()
+		})
+
+		test('first match wins (source-only before specific)', async () => {
+			const router = new EventRouter()
+			const exactHandler = mock(() => {})
+			const sourceOnlyHandler = mock(() => {})
+
+			router.event({ source: 'myapp.users' }, sourceOnlyHandler)
+			router.event(
+				{ source: 'myapp.users', detailType: 'UserCreated' },
+				exactHandler,
+			)
+
+			const event = createEventBridgeEvent('myapp.users', 'UserCreated', {})
+			await router.handler()(event, mockLambdaContext)
+
+			expect(sourceOnlyHandler).toHaveBeenCalledTimes(1)
+			expect(exactHandler).not.toHaveBeenCalled()
 		})
 
 		test('provides correct context properties', async () => {
 			const router = new EventRouter()
 			let capturedContext: unknown
 
-			router.event('myapp.users/UserCreated', (c) => {
-				capturedContext = {
-					source: c.event.source,
-					detailType: c.event.detailType,
-					detail: c.event.detail,
-				}
-			})
+			router.event(
+				{ source: 'myapp.users', detailType: 'UserCreated' },
+				(c) => {
+					capturedContext = {
+						source: c.event.source,
+						detailType: c.event.detailType,
+						detail: c.event.detail,
+					}
+				},
+			)
 
 			const event = createEventBridgeEvent('myapp.users', 'UserCreated', {
 				userId: '123',
@@ -309,11 +351,11 @@ describe('EventRouter', () => {
 	})
 
 	describe('DynamoDB Streams routing', () => {
-		test('routes to exact table/eventName match', async () => {
+		test('routes to insert with table match', async () => {
 			const router = new EventRouter()
 			const handler = mock(() => {})
 
-			router.dynamodb('orders-table/INSERT', handler)
+			router.dynamodb.insert({ tableName: 'orders-table' }, handler)
 
 			const event = createDynamoDBEvent(
 				'orders-table',
@@ -326,13 +368,58 @@ describe('EventRouter', () => {
 			expect(handler).toHaveBeenCalledTimes(1)
 		})
 
-		test('routes to partial match (table/*)', async () => {
+		test('routes to insert catch-all (any table)', async () => {
 			const router = new EventRouter()
 			const handler = mock(() => {})
 
-			router.dynamodb('orders-table/*', handler)
+			router.dynamodb.insert(handler)
+
+			const event = createDynamoDBEvent('any-table', 'INSERT', {
+				pk: { S: 'order-123' },
+			})
+			await router.handler()(event, mockLambdaContext)
+
+			expect(handler).toHaveBeenCalledTimes(1)
+		})
+
+		test('routes to table-only match (all event names)', async () => {
+			const router = new EventRouter()
+			const handler = mock(() => {})
+
+			router.dynamodb({ tableName: 'orders-table' }, handler)
 
 			const event = createDynamoDBEvent('orders-table', 'MODIFY', {
+				pk: { S: 'order-123' },
+			})
+			await router.handler()(event, mockLambdaContext)
+
+			expect(handler).toHaveBeenCalledTimes(1)
+		})
+
+		test('routes modify events correctly', async () => {
+			const router = new EventRouter()
+			const insertHandler = mock(() => {})
+			const modifyHandler = mock(() => {})
+
+			router.dynamodb.insert(insertHandler)
+			router.dynamodb.modify(modifyHandler)
+
+			const event = createDynamoDBEvent('orders-table', 'MODIFY', {
+				pk: { S: 'order-123' },
+			})
+			await router.handler()(event, mockLambdaContext)
+
+			expect(modifyHandler).toHaveBeenCalledTimes(1)
+			expect(insertHandler).not.toHaveBeenCalled()
+		})
+
+		test('routes remove events correctly', async () => {
+			const router = new EventRouter()
+			const handler = mock(() => {})
+
+			router.dynamodb.remove({ tableName: 'orders-table' }, handler)
+
+			const event = createDynamoDBEvent('orders-table', 'REMOVE', {
 				pk: { S: 'order-123' },
 			})
 			await router.handler()(event, mockLambdaContext)
@@ -344,7 +431,7 @@ describe('EventRouter', () => {
 			const router = new EventRouter()
 			let capturedKeys: unknown
 
-			router.dynamodb('orders-table/INSERT', (c) => {
+			router.dynamodb.insert({ tableName: 'orders-table' }, (c) => {
 				capturedKeys = c.dynamodb.keys
 			})
 
@@ -378,7 +465,7 @@ describe('EventRouter', () => {
 			const router = new EventRouter()
 			const errorHandler = mock(() => {})
 
-			router.sqs('orders-queue', () => {
+			router.sqs({ queueName: 'orders-queue' }, () => {
 				throw new Error('Handler error')
 			})
 			router.onError(errorHandler)
@@ -393,7 +480,7 @@ describe('EventRouter', () => {
 			const router = new EventRouter()
 			let capturedError: Error | undefined
 
-			router.sqs('orders-queue', () => {
+			router.sqs({ queueName: 'orders-queue' }, () => {
 				throw new Error('Test error message')
 			})
 			router.onError((err) => {

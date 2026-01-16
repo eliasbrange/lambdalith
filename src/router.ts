@@ -17,57 +17,157 @@ import {
 import { detectEventType } from './detection.ts'
 import type {
 	DynamoDBHandler,
+	DynamoDBMatchOptions,
+	DynamoDBTableOptions,
 	ErrorHandler,
 	EventBridgeHandler,
+	EventBridgeMatchOptions,
 	NotFoundHandler,
 	Route,
 	SNSHandler,
+	SNSMatchOptions,
 	SQSHandler,
+	SQSMatchOptions,
 } from './types.ts'
+
+type DynamoDBEventMethod = {
+	(handler: DynamoDBHandler): EventRouter
+	(options: DynamoDBTableOptions, handler: DynamoDBHandler): EventRouter
+}
+
+type DynamoDBRouter = {
+	(handler: DynamoDBHandler): EventRouter
+	(options: DynamoDBTableOptions, handler: DynamoDBHandler): EventRouter
+	insert: DynamoDBEventMethod
+	modify: DynamoDBEventMethod
+	remove: DynamoDBEventMethod
+}
+
 import { parseQueueName, parseTableName, parseTopicName } from './utils.ts'
 
 export class EventRouter {
-	private sqsRoutes: Route<SQSHandler>[] = []
-	private snsRoutes: Route<SNSHandler>[] = []
-	private eventRoutes: Route<EventBridgeHandler>[] = []
-	private dynamodbRoutes: Route<DynamoDBHandler>[] = []
+	private sqsRoutes: Route<SQSHandler, SQSMatchOptions | undefined>[] = []
+	private snsRoutes: Route<SNSHandler, SNSMatchOptions | undefined>[] = []
+	private eventRoutes: Route<
+		EventBridgeHandler,
+		EventBridgeMatchOptions | undefined
+	>[] = []
+	private dynamodbRoutes: Route<
+		DynamoDBHandler,
+		DynamoDBMatchOptions | undefined
+	>[] = []
 	private notFoundHandler?: NotFoundHandler
 	private errorHandler?: ErrorHandler
 
 	/**
-	 * Register an SQS handler for a queue pattern.
-	 * Patterns: 'queue-name' (exact) or '*' (catch-all)
+	 * Register an SQS handler.
+	 * Routes are matched in registration order (first match wins).
 	 */
-	sqs(pattern: string, handler: SQSHandler): this {
-		this.sqsRoutes.push({ pattern, handler })
+	sqs(handler: SQSHandler): this
+	sqs(options: SQSMatchOptions, handler: SQSHandler): this
+	sqs(
+		optionsOrHandler: SQSMatchOptions | SQSHandler,
+		handler?: SQSHandler,
+	): this {
+		if (typeof optionsOrHandler === 'function') {
+			this.sqsRoutes.push({ options: undefined, handler: optionsOrHandler })
+		} else if (handler) {
+			this.sqsRoutes.push({ options: optionsOrHandler, handler })
+		}
 		return this
 	}
 
 	/**
-	 * Register an SNS handler for a topic pattern.
-	 * Patterns: 'topic-name' (exact) or '*' (catch-all)
+	 * Register an SNS handler.
+	 * Routes are matched in registration order (first match wins).
 	 */
-	sns(pattern: string, handler: SNSHandler): this {
-		this.snsRoutes.push({ pattern, handler })
+	sns(handler: SNSHandler): this
+	sns(options: SNSMatchOptions, handler: SNSHandler): this
+	sns(
+		optionsOrHandler: SNSMatchOptions | SNSHandler,
+		handler?: SNSHandler,
+	): this {
+		if (typeof optionsOrHandler === 'function') {
+			this.snsRoutes.push({ options: undefined, handler: optionsOrHandler })
+		} else if (handler) {
+			this.snsRoutes.push({ options: optionsOrHandler, handler })
+		}
 		return this
 	}
 
 	/**
-	 * Register an EventBridge handler for a source/detail-type pattern.
-	 * Patterns: 'source/detailType' (exact), 'source/*' (partial), or '*' (catch-all)
+	 * Register an EventBridge handler.
+	 * Routes are matched in registration order (first match wins).
 	 */
-	event(pattern: string, handler: EventBridgeHandler): this {
-		this.eventRoutes.push({ pattern, handler })
+	event(handler: EventBridgeHandler): this
+	event(options: EventBridgeMatchOptions, handler: EventBridgeHandler): this
+	event(
+		optionsOrHandler: EventBridgeMatchOptions | EventBridgeHandler,
+		handler?: EventBridgeHandler,
+	): this {
+		if (typeof optionsOrHandler === 'function') {
+			this.eventRoutes.push({ options: undefined, handler: optionsOrHandler })
+		} else if (handler) {
+			this.eventRoutes.push({ options: optionsOrHandler, handler })
+		}
 		return this
 	}
 
 	/**
-	 * Register a DynamoDB Streams handler for a table/event pattern.
-	 * Patterns: 'table/INSERT' (exact), 'table/*' (partial), or '*' (catch-all)
+	 * Register a DynamoDB Streams handler.
+	 * Routes are matched in registration order (first match wins).
+	 *
+	 * @example
+	 * // Catch-all
+	 * router.dynamodb(handler)
+	 *
+	 * // Specific table, all events
+	 * router.dynamodb({ tableName: 'orders' }, handler)
+	 *
+	 * // Specific event type
+	 * router.dynamodb.insert(handler)
+	 * router.dynamodb.insert({ tableName: 'orders' }, handler)
 	 */
-	dynamodb(pattern: string, handler: DynamoDBHandler): this {
-		this.dynamodbRoutes.push({ pattern, handler })
-		return this
+	get dynamodb(): DynamoDBRouter {
+		const addRoute = (
+			eventName: 'INSERT' | 'MODIFY' | 'REMOVE' | undefined,
+			optionsOrHandler: DynamoDBTableOptions | DynamoDBHandler,
+			handler?: DynamoDBHandler,
+		): this => {
+			if (typeof optionsOrHandler === 'function') {
+				this.dynamodbRoutes.push({
+					options: eventName ? { eventName } : undefined,
+					handler: optionsOrHandler,
+				})
+			} else if (handler) {
+				this.dynamodbRoutes.push({
+					options: { tableName: optionsOrHandler.tableName, eventName },
+					handler,
+				})
+			}
+			return this
+		}
+
+		const createEventMethod = (
+			eventName: 'INSERT' | 'MODIFY' | 'REMOVE',
+		): DynamoDBEventMethod => {
+			return ((
+				optionsOrHandler: DynamoDBTableOptions | DynamoDBHandler,
+				handler?: DynamoDBHandler,
+			) =>
+				addRoute(eventName, optionsOrHandler, handler)) as DynamoDBEventMethod
+		}
+
+		const base = (
+			optionsOrHandler: DynamoDBTableOptions | DynamoDBHandler,
+			handler?: DynamoDBHandler,
+		) => addRoute(undefined, optionsOrHandler, handler)
+
+		return Object.assign(base, {
+			insert: createEventMethod('INSERT'),
+			modify: createEventMethod('MODIFY'),
+			remove: createEventMethod('REMOVE'),
+		}) as DynamoDBRouter
 	}
 
 	/**
@@ -276,18 +376,11 @@ export class EventRouter {
 		}
 	}
 
-	// Pattern matching methods
+	// Matching methods (first match wins)
 
 	private matchSQSHandler(queue: string): SQSHandler | undefined {
-		// Sort by specificity: exact matches first, then wildcards
-		const sorted = [...this.sqsRoutes].sort((a, b) => {
-			if (a.pattern === '*' && b.pattern !== '*') return 1
-			if (a.pattern !== '*' && b.pattern === '*') return -1
-			return 0
-		})
-
-		for (const route of sorted) {
-			if (route.pattern === '*' || route.pattern === queue) {
+		for (const route of this.sqsRoutes) {
+			if (!route.options || route.options.queueName === queue) {
 				return route.handler
 			}
 		}
@@ -295,14 +388,8 @@ export class EventRouter {
 	}
 
 	private matchSNSHandler(topic: string): SNSHandler | undefined {
-		const sorted = [...this.snsRoutes].sort((a, b) => {
-			if (a.pattern === '*' && b.pattern !== '*') return 1
-			if (a.pattern !== '*' && b.pattern === '*') return -1
-			return 0
-		})
-
-		for (const route of sorted) {
-			if (route.pattern === '*' || route.pattern === topic) {
+		for (const route of this.snsRoutes) {
+			if (!route.options || route.options.topicName === topic) {
 				return route.handler
 			}
 		}
@@ -313,28 +400,16 @@ export class EventRouter {
 		source: string,
 		detailType: string,
 	): EventBridgeHandler | undefined {
-		const key = `${source}/${detailType}`
-
-		// Sort by specificity: exact > partial > wildcard
-		const sorted = [...this.eventRoutes].sort((a, b) => {
-			const scoreA = this.getEventBridgePatternScore(a.pattern)
-			const scoreB = this.getEventBridgePatternScore(b.pattern)
-			return scoreB - scoreA // Higher score = more specific
-		})
-
-		for (const route of sorted) {
-			if (route.pattern === '*') {
+		for (const route of this.eventRoutes) {
+			if (!route.options) {
 				return route.handler
 			}
-			if (route.pattern === key) {
+			const sourceMatch =
+				!route.options.source || route.options.source === source
+			const detailTypeMatch =
+				!route.options.detailType || route.options.detailType === detailType
+			if (sourceMatch && detailTypeMatch) {
 				return route.handler
-			}
-			// Check for partial match (source/*)
-			if (route.pattern.endsWith('/*')) {
-				const patternSource = route.pattern.slice(0, -2)
-				if (patternSource === source) {
-					return route.handler
-				}
 			}
 		}
 		return undefined
@@ -344,42 +419,18 @@ export class EventRouter {
 		table: string,
 		eventName: string,
 	): DynamoDBHandler | undefined {
-		const key = `${table}/${eventName}`
-
-		// Sort by specificity: exact > partial > wildcard
-		const sorted = [...this.dynamodbRoutes].sort((a, b) => {
-			const scoreA = this.getDynamoDBPatternScore(a.pattern)
-			const scoreB = this.getDynamoDBPatternScore(b.pattern)
-			return scoreB - scoreA
-		})
-
-		for (const route of sorted) {
-			if (route.pattern === '*') {
+		for (const route of this.dynamodbRoutes) {
+			if (!route.options) {
 				return route.handler
 			}
-			if (route.pattern === key) {
+			const tableMatch =
+				!route.options.tableName || route.options.tableName === table
+			const eventNameMatch =
+				!route.options.eventName || route.options.eventName === eventName
+			if (tableMatch && eventNameMatch) {
 				return route.handler
-			}
-			// Check for partial match (table/*)
-			if (route.pattern.endsWith('/*')) {
-				const patternTable = route.pattern.slice(0, -2)
-				if (patternTable === table) {
-					return route.handler
-				}
 			}
 		}
 		return undefined
-	}
-
-	private getEventBridgePatternScore(pattern: string): number {
-		if (pattern === '*') return 0
-		if (pattern.endsWith('/*')) return 1
-		return 2 // Exact match
-	}
-
-	private getDynamoDBPatternScore(pattern: string): number {
-		if (pattern === '*') return 0
-		if (pattern.endsWith('/*')) return 1
-		return 2 // Exact match
 	}
 }
