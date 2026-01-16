@@ -38,7 +38,12 @@ export function createSQSEvent(
 					SenderId: 'test-sender',
 					ApproximateFirstReceiveTimestamp: '1234567890000',
 				},
-				messageAttributes: {},
+				messageAttributes: {
+					myAttribute: {
+						dataType: 'String',
+						stringValue: 'value',
+					},
+				},
 				md5OfBody: 'test-md5',
 				eventSource: 'aws:sqs',
 				eventSourceARN: `arn:aws:sqs:us-east-1:123456789:${queueName}`,

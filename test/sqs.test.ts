@@ -67,6 +67,7 @@ describe('SQS routing', () => {
 				body: c.sqs.body,
 				messageId: c.sqs.messageId,
 				lambdaRequestId: c.lambdaContext.awsRequestId,
+				myAttribute: c.sqs.attribute('myAttribute'),
 			}
 		})
 
@@ -80,6 +81,7 @@ describe('SQS routing', () => {
 			body: { orderId: '456' },
 			messageId: 'msg-123',
 			lambdaRequestId: 'test-request-id',
+			myAttribute: 'value',
 		})
 	})
 
