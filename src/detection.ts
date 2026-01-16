@@ -4,7 +4,6 @@ import type {
 	SNSEvent,
 	SQSEvent,
 } from './aws-types.ts'
-import type { EventSource } from './types.ts'
 
 export type DetectedEvent =
 	| { type: 'sqs'; event: SQSEvent }
@@ -53,21 +52,4 @@ export function detectEventType(event: unknown): DetectedEvent {
 	}
 
 	return { type: 'unknown', event }
-}
-
-/**
- * Type guard for checking if detected event is a known type.
- */
-export function isKnownEventType(
-	detected: DetectedEvent,
-): detected is Exclude<DetectedEvent, { type: 'unknown' }> {
-	return detected.type !== 'unknown'
-}
-
-/**
- * Get the event source type from a detected event.
- */
-export function getEventSource(detected: DetectedEvent): EventSource | null {
-	if (detected.type === 'unknown') return null
-	return detected.type
 }
