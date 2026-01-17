@@ -50,16 +50,14 @@ describe('EventRouter', () => {
 	})
 
 	describe('Event detection', () => {
-		test('handles unknown event types gracefully', async () => {
+		test('throws on unknown event types', async () => {
 			const router = new EventRouter()
-			const notFoundHandler = mock(() => {})
-
-			router.notFound(notFoundHandler)
 
 			const unknownEvent = { foo: 'bar' }
-			await router.handler()(unknownEvent, mockLambdaContext)
 
-			expect(notFoundHandler).toHaveBeenCalledTimes(1)
+			expect(router.handler()(unknownEvent, mockLambdaContext)).rejects.toThrow(
+				'Unknown event type',
+			)
 		})
 	})
 })

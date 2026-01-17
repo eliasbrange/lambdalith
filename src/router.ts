@@ -215,12 +215,9 @@ export class EventRouter {
 				case 'dynamodb':
 					return this.handleDynamoDB(detected.event, context)
 				case 'unknown':
-					// No matching event type - call notFound if registered
-					if (this.notFoundHandler) {
-						const ctx = createNotFoundContext('sqs', event, context)
-						await this.notFoundHandler(ctx)
-					}
-					return undefined
+					throw new Error(
+						`Unknown event type. Ensure your Lambda is configured with a supported trigger (SQS, SNS, EventBridge, DynamoDB Streams).`,
+					)
 			}
 		}
 	}
