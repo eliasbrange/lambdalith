@@ -34,20 +34,79 @@ import { EventRouter } from 'lambda-router-poc';
 
 const router = new EventRouter();
 
+// SQS - catch-all
 router.sqs((c) => {
-  console.log('SQS message:', c.sqs.body);
+  console.log(c.sqs.body);
 });
 
+// SQS - match by queue name
+router.sqs({ queueName: 'orders-queue' }, (c) => {
+  console.log(c.sqs.body);
+});
+
+// SQS - sequential processing (for FIFO or ordered processing)
+router.sqs({ queueName: 'orders-queue.fifo', sequential: true }, (c) => {
+  console.log(c.sqs.body);
+});
+
+// SNS - catch-all
 router.sns((c) => {
-  console.log('SNS message:', c.sns.body);
+  console.log(c.sns.body);
 });
 
+// SNS - match by topic name
+router.sns({ topicName: 'user-events' }, (c) => {
+  console.log(c.sns.body);
+});
+
+// SNS - sequential processing
+router.sns({ topicName: 'ordered-events', sequential: true }, (c) => {
+  console.log(c.sns.body);
+});
+
+// EventBridge - catch-all
 router.event((c) => {
-  console.log('EventBridge event:', c.event.detail);
+  console.log(c.event.detail);
 });
 
+// EventBridge - match by source
+router.event({ source: 'myapp.orders' }, (c) => {
+  console.log(c.event.detail);
+});
+
+// EventBridge - match by source and detail-type
+router.event({ source: 'myapp.orders', detailType: 'OrderCreated' }, (c) => {
+  console.log(c.event.detail);
+});
+
+// DynamoDB Streams - catch-all
 router.dynamodb((c) => {
-  console.log('DynamoDB record:', c.dynamodb.newImage);
+  console.log(c.dynamodb.newImage);
+});
+
+// DynamoDB Streams - match by table name
+router.dynamodb({ tableName: 'orders' }, (c) => {
+  console.log(c.dynamodb.newImage);
+});
+
+// DynamoDB Streams - match by table name and event type
+router.dynamodb.insert({ tableName: 'orders' }, (c) => {
+  console.log(c.dynamodb.newImage);
+});
+
+// DynamoDB Streams - sequential processing
+router.dynamodb({ tableName: 'orders', sequential: true }, (c) => {
+  console.log(c.dynamodb.newImage);
+});
+
+// Error handler - called when a handler throws
+router.onError((error, c) => {
+  console.error(error.message, c.source, c.raw);
+});
+
+// Not found handler - called when no route matches
+router.notFound((c) => {
+  console.warn('Unhandled:', c.source, c.raw);
 });
 
 export const handler = router.handler();
@@ -55,62 +114,30 @@ export const handler = router.handler();
 
 ---
 
-## SQS
+## Route Matching
 
-### Basic Handler
-
-Handle all SQS messages:
+Routes are matched in registration order – the first matching route wins. Register specific routes before catch-alls:
 
 ```typescript
-import { EventRouter } from 'lambda-router-poc';
-
-const router = new EventRouter();
-
-router.sqs((c) => {
-  console.log('Queue:', c.sqs.queue);
-  console.log('Body:', c.sqs.body);
-  console.log('Message ID:', c.sqs.messageId);
-});
-
-export const handler = router.handler();
+router.sqs({ queueName: 'specific-queue' }, (c) => {});
+router.sqs((c) => {});
 ```
 
-### Route by Queue Name
+---
 
-Handle messages from a specific queue:
+## Batch Processing
 
-```typescript
-const router = new EventRouter();
+For SQS and DynamoDB Streams, the router automatically handles partial batch failures. Turn on [ReportBatchItemFailures](https://docs.aws.amazon.com/lambda/latest/dg/services-ddb-batchfailurereporting.html) on your function to take advantage of this feature.
 
-router.sqs({ queueName: 'orders-queue' }, (c) => {
-  console.log('Order received:', c.sqs.body);
-});
+**Default (parallel):** All records processed concurrently. Failed records reported individually.
 
-router.sqs({ queueName: 'notifications-queue' }, (c) => {
-  console.log('Notification:', c.sqs.body);
-});
+**Sequential:** Records processed one at a time. On failure, remaining records marked as failed.
 
-// Catch-all for unmatched queues
-router.sqs((c) => {
-  console.log('Other message:', c.sqs.body);
-});
-```
+---
 
-### Sequential Processing
+## Context Reference
 
-Process messages in order (for FIFO queues or ordered processing):
-
-```typescript
-const router = new EventRouter();
-
-router.sqs({ queueName: 'orders-queue.fifo', sequential: true }, (c) => {
-  // Messages processed one at a time, in order
-  // On failure, remaining messages are marked as failed
-  console.log('Processing order:', c.sqs.body);
-});
-```
-
-### SQS Context Reference
+### SQS
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -123,65 +150,10 @@ router.sqs({ queueName: 'orders-queue.fifo', sequential: true }, (c) => {
 | `c.sqs.messageGroupId` | `string \| undefined` | FIFO message group ID |
 | `c.sqs.messageDeduplicationId` | `string \| undefined` | FIFO deduplication ID |
 | `c.sqs.attributes` | `Record<string, string>` | Message attributes |
-| `c.sqs.attribute(name)` | `(name: string) => string \| undefined` | Get a specific attribute |
+| `c.sqs.attribute(name)` | `string \| undefined` | Get a specific attribute |
 | `c.sqs.raw` | `SQSRecord` | Raw AWS SQS record |
 
----
-
-## SNS
-
-### Basic Handler
-
-Handle all SNS messages:
-
-```typescript
-import { EventRouter } from 'lambda-router-poc';
-
-const router = new EventRouter();
-
-router.sns((c) => {
-  console.log('Topic:', c.sns.topic);
-  console.log('Body:', c.sns.body);
-  console.log('Subject:', c.sns.subject);
-});
-
-export const handler = router.handler();
-```
-
-### Route by Topic Name
-
-Handle messages from a specific topic:
-
-```typescript
-const router = new EventRouter();
-
-router.sns({ topicName: 'user-events' }, (c) => {
-  console.log('User event:', c.sns.body);
-});
-
-router.sns({ topicName: 'system-alerts' }, (c) => {
-  console.log('Alert:', c.sns.body);
-});
-
-// Catch-all for unmatched topics
-router.sns((c) => {
-  console.log('Other notification:', c.sns.body);
-});
-```
-
-### Sequential Processing
-
-Process messages in order:
-
-```typescript
-const router = new EventRouter();
-
-router.sns({ topicName: 'ordered-events', sequential: true }, (c) => {
-  console.log('Processing in order:', c.sns.body);
-});
-```
-
-### SNS Context Reference
+### SNS
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -192,85 +164,10 @@ router.sns({ topicName: 'ordered-events', sequential: true }, (c) => {
 | `c.sns.subject` | `string \| undefined` | Message subject |
 | `c.sns.timestamp` | `Date` | When the message was published |
 | `c.sns.attributes` | `Record<string, string>` | Message attributes |
-| `c.sns.attribute(name)` | `(name: string) => string \| undefined` | Get a specific attribute |
+| `c.sns.attribute(name)` | `string \| undefined` | Get a specific attribute |
 | `c.sns.raw` | `SNSEventRecord` | Raw AWS SNS record |
 
----
-
-## EventBridge
-
-### Basic Handler
-
-Handle all EventBridge events:
-
-```typescript
-import { EventRouter } from 'lambda-router-poc';
-
-const router = new EventRouter();
-
-router.event((c) => {
-  console.log('Source:', c.event.source);
-  console.log('Detail Type:', c.event.detailType);
-  console.log('Detail:', c.event.detail);
-});
-
-export const handler = router.handler();
-```
-
-### Route by Source
-
-Handle events from a specific source:
-
-```typescript
-const router = new EventRouter();
-
-router.event({ source: 'myapp.orders' }, (c) => {
-  console.log('Order event:', c.event.detail);
-});
-
-router.event({ source: 'myapp.users' }, (c) => {
-  console.log('User event:', c.event.detail);
-});
-```
-
-### Route by Detail Type
-
-Handle events with a specific detail-type:
-
-```typescript
-const router = new EventRouter();
-
-router.event({ detailType: 'OrderCreated' }, (c) => {
-  console.log('New order:', c.event.detail);
-});
-
-router.event({ detailType: 'OrderShipped' }, (c) => {
-  console.log('Order shipped:', c.event.detail);
-});
-```
-
-### Route by Source and Detail Type
-
-Combine source and detail-type matching:
-
-```typescript
-const router = new EventRouter();
-
-router.event({ source: 'myapp.orders', detailType: 'OrderCreated' }, (c) => {
-  console.log('New order from orders service:', c.event.detail);
-});
-
-router.event({ source: 'myapp.orders', detailType: 'OrderCancelled' }, (c) => {
-  console.log('Order cancelled:', c.event.detail);
-});
-
-// Catch-all for other order events
-router.event({ source: 'myapp.orders' }, (c) => {
-  console.log('Other order event:', c.event.detailType);
-});
-```
-
-### EventBridge Context Reference
+### EventBridge
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -284,102 +181,7 @@ router.event({ source: 'myapp.orders' }, (c) => {
 | `c.event.resources` | `string[]` | Related resources |
 | `c.event.raw` | `EventBridgeEvent` | Raw AWS EventBridge event |
 
----
-
-## DynamoDB Streams
-
-### Basic Handler
-
-Handle all DynamoDB stream records:
-
-```typescript
-import { EventRouter } from 'lambda-router-poc';
-
-const router = new EventRouter();
-
-router.dynamodb((c) => {
-  console.log('Table:', c.dynamodb.table);
-  console.log('Event:', c.dynamodb.eventName);
-  console.log('Keys:', c.dynamodb.keys);
-  console.log('New Image:', c.dynamodb.newImage);
-  console.log('Old Image:', c.dynamodb.oldImage);
-});
-
-export const handler = router.handler();
-```
-
-### Route by Table Name
-
-Handle records from a specific table:
-
-```typescript
-const router = new EventRouter();
-
-router.dynamodb({ tableName: 'orders' }, (c) => {
-  console.log('Order change:', c.dynamodb.eventName);
-});
-
-router.dynamodb({ tableName: 'users' }, (c) => {
-  console.log('User change:', c.dynamodb.eventName);
-});
-```
-
-### Route by Event Type
-
-Handle specific DynamoDB operations using `.insert`, `.modify`, or `.remove`:
-
-```typescript
-const router = new EventRouter();
-
-router.dynamodb.insert((c) => {
-  console.log('New record:', c.dynamodb.newImage);
-});
-
-router.dynamodb.modify((c) => {
-  console.log('Updated record:', c.dynamodb.newImage);
-  console.log('Previous values:', c.dynamodb.oldImage);
-});
-
-router.dynamodb.remove((c) => {
-  console.log('Deleted record:', c.dynamodb.oldImage);
-});
-```
-
-### Route by Table and Event Type
-
-Combine table name and event type matching:
-
-```typescript
-const router = new EventRouter();
-
-router.dynamodb.insert({ tableName: 'orders' }, (c) => {
-  console.log('New order:', c.dynamodb.newImage);
-});
-
-router.dynamodb.modify({ tableName: 'orders' }, (c) => {
-  console.log('Order updated:', c.dynamodb.newImage);
-});
-
-router.dynamodb.remove({ tableName: 'orders' }, (c) => {
-  console.log('Order deleted:', c.dynamodb.keys);
-});
-```
-
-### Sequential Processing
-
-Process records in order:
-
-```typescript
-const router = new EventRouter();
-
-router.dynamodb({ tableName: 'orders', sequential: true }, (c) => {
-  // Records processed one at a time, in order
-  // On failure, remaining records are marked as failed
-  console.log('Processing:', c.dynamodb.eventName);
-});
-```
-
-### DynamoDB Context Reference
+### DynamoDB Streams
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -393,108 +195,15 @@ router.dynamodb({ tableName: 'orders', sequential: true }, (c) => {
 | `c.dynamodb.streamArn` | `string` | Stream ARN |
 | `c.dynamodb.raw` | `DynamoDBRecord` | Raw AWS DynamoDB record |
 
----
+### Shared
 
-## Error Handling
+All handlers have access to:
 
-### Global Error Handler
-
-Handle errors thrown by any route handler:
-
-```typescript
-const router = new EventRouter();
-
-router.sqs((c) => {
-  throw new Error('Something went wrong');
-});
-
-router.onError((error, c) => {
-  console.error('Error occurred:', error.message);
-  console.log('Event source:', c.source);
-  console.log('Raw event:', c.raw);
-  // Error is still re-thrown after handler executes
-});
-```
-
-### Not Found Handler
-
-Handle events that don't match any registered route:
-
-```typescript
-const router = new EventRouter();
-
-router.sqs({ queueName: 'known-queue' }, (c) => {
-  console.log('Known queue message');
-});
-
-router.notFound((c) => {
-  console.warn('Unhandled event from source:', c.source);
-  console.log('Raw event:', c.raw);
-});
-```
-
----
-
-## Shared Context
-
-All handlers have access to the Lambda context and a key-value store:
-
-```typescript
-const router = new EventRouter();
-
-router.sqs((c) => {
-  // Access Lambda context
-  console.log('Request ID:', c.lambdaContext.awsRequestId);
-  console.log('Function name:', c.lambdaContext.functionName);
-
-  // Use key-value store
-  c.set('userId', '12345');
-  const userId = c.get<string>('userId');
-});
-```
-
----
-
-## Route Matching
-
-Routes are matched in registration order – the first matching route wins:
-
-```typescript
-const router = new EventRouter();
-
-// Specific routes first
-router.sqs({ queueName: 'priority-queue' }, handlePriority);
-router.sqs({ queueName: 'orders-queue' }, handleOrders);
-
-// Catch-all last
-router.sqs(handleOther);
-```
-
----
-
-## Method Chaining
-
-All router methods return `this`, so you can chain them if preferred:
-
-```typescript
-const router = new EventRouter()
-  .sqs({ queueName: 'orders' }, handleOrders)
-  .sqs({ queueName: 'notifications' }, handleNotifications)
-  .onError(handleError)
-  .notFound(handleNotFound);
-
-export const handler = router.handler();
-```
-
----
-
-## Batch Processing
-
-For SQS and DynamoDB Streams, the router automatically handles partial batch failures by returning an `SQSBatchResponse` with failed message identifiers. Configure your Lambda function to use this response for automatic retry of failed records.
-
-**Default (parallel):** All records are processed concurrently. Failed records are reported individually.
-
-**Sequential:** Records are processed one at a time. On failure, the current and all remaining records are marked as failed (preserving order guarantees).
+| Property | Type | Description |
+|----------|------|-------------|
+| `c.lambdaContext` | `LambdaContext` | AWS Lambda context |
+| `c.get(key)` | `<T>(key: string) => T \| undefined` | Get value from key-value store |
+| `c.set(key, value)` | `(key: string, value: unknown) => void` | Set value in key-value store |
 
 ---
 
