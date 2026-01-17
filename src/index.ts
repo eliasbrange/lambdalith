@@ -1,6 +1,7 @@
 // Re-export AWS types for consumers who need raw types
 export type {
 	AttributeValue,
+	BatchResponse,
 	DynamoDBRecord,
 	DynamoDBStreamEvent,
 	EventBridgeEvent,
@@ -8,7 +9,6 @@ export type {
 	SNSEvent,
 	SNSEventRecord,
 	SNSMessage,
-	SQSBatchResponse,
 	SQSEvent,
 	SQSRecord,
 	StreamRecord,

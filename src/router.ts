@@ -1,9 +1,9 @@
 import type {
+	BatchResponse,
 	DynamoDBStreamEvent,
 	EventBridgeEvent,
 	LambdaContext,
 	SNSEvent,
-	SQSBatchResponse,
 	SQSEvent,
 } from './aws-types.ts'
 import {
@@ -196,11 +196,11 @@ export class EventRouter {
 	handler(): (
 		event: unknown,
 		context: LambdaContext,
-	) => Promise<SQSBatchResponse | undefined> {
+	) => Promise<BatchResponse | undefined> {
 		return async (
 			event: unknown,
 			context: LambdaContext,
-		): Promise<SQSBatchResponse | undefined> => {
+		): Promise<BatchResponse | undefined> => {
 			const detected = detectEventType(event)
 
 			switch (detected.type) {
@@ -225,7 +225,7 @@ export class EventRouter {
 	private async handleSQS(
 		event: SQSEvent,
 		lambdaContext: LambdaContext,
-	): Promise<SQSBatchResponse> {
+	): Promise<BatchResponse> {
 		const failures: string[] = []
 
 		// Determine if sequential processing is needed from first record's route
@@ -377,7 +377,7 @@ export class EventRouter {
 	private async handleDynamoDB(
 		event: DynamoDBStreamEvent,
 		lambdaContext: LambdaContext,
-	): Promise<SQSBatchResponse> {
+	): Promise<BatchResponse> {
 		const failures: string[] = []
 
 		// Determine if sequential processing is needed from first record's route

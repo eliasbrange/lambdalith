@@ -15,9 +15,9 @@ type AssertAssignable<T, U extends T> = U
 // Verify SQSEvent compatibility
 type _SQSEventCompat = AssertAssignable<Official.SQSEvent, Custom.SQSEvent>
 type _SQSRecordCompat = AssertAssignable<Official.SQSRecord, Custom.SQSRecord>
-type _SQSBatchResponseCompat = AssertAssignable<
+type _BatchResponseCompat = AssertAssignable<
 	Official.SQSBatchResponse,
-	Custom.SQSBatchResponse
+	Custom.BatchResponse
 >
 
 // Verify SNSEvent compatibility
@@ -65,7 +65,7 @@ type _ContextCompat = AssertAssignable<
 export type {
 	_SQSEventCompat,
 	_SQSRecordCompat,
-	_SQSBatchResponseCompat,
+	_BatchResponseCompat,
 	_SNSEventCompat,
 	_SNSEventRecordCompat,
 	_SNSMessageCompat,

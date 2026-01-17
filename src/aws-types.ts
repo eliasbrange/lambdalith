@@ -128,10 +128,10 @@ export type AttributeValue =
 	| { BOOL: boolean }
 
 // Batch failure response
-export interface SQSBatchResponse {
-	batchItemFailures: SQSBatchItemFailure[]
+export interface BatchResponse {
+	batchItemFailures: BatchItemFailure[]
 }
 
-export interface SQSBatchItemFailure {
+export interface BatchItemFailure {
 	itemIdentifier: string
 }
