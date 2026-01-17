@@ -1,6 +1,6 @@
 {
 	"name": "lambda-router-poc",
-	"description": "Lambda Router PoC",
+	"description": "A tiny event router for AWS Lambda functions. Route SQS, SNS, EventBridge, and DynamoDB Streams events with a fluent API.",
 	"version": "0.1.0",
 	"author": "Elias Brange",
 	"keywords": [
