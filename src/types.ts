@@ -12,7 +12,7 @@ export type EventSource = 'sqs' | 'sns' | 'event' | 'dynamodb'
 
 // Base context with shared functionality
 export interface BaseContext {
-	readonly lambdaContext: LambdaContext
+	readonly lambda: LambdaContext
 	get<T = unknown>(key: string): T | undefined
 	set(key: string, value: unknown): void
 }

@@ -28,12 +28,12 @@ import {
 } from './utils.ts'
 
 /**
- * Base context implementation with get/set and lambdaContext.
+ * Base context implementation with get/set and lambda context.
  */
 class BaseContextImpl implements BaseContext {
 	private store = new Map<string, unknown>()
 
-	constructor(public readonly lambdaContext: LambdaContext) {}
+	constructor(public readonly lambda: LambdaContext) {}
 
 	get<T = unknown>(key: string): T | undefined {
 		return this.store.get(key) as T | undefined

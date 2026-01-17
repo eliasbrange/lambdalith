@@ -201,7 +201,7 @@ All handlers have access to:
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `c.lambdaContext` | `LambdaContext` | AWS Lambda context |
+| `c.lambda` | `LambdaContext` | AWS Lambda context |
 | `c.get(key)` | `<T>(key: string) => T \| undefined` | Get value from key-value store |
 | `c.set(key, value)` | `(key: string, value: unknown) => void` | Set value in key-value store |
 

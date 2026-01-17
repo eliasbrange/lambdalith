@@ -70,7 +70,7 @@ describe('SQS routing', () => {
 				queue: c.sqs.queue,
 				body: c.sqs.body,
 				messageId: c.sqs.messageId,
-				lambdaRequestId: c.lambdaContext.awsRequestId,
+				lambdaRequestId: c.lambda.awsRequestId,
 				myAttribute: c.sqs.attribute('myAttribute'),
 			}
 		})
