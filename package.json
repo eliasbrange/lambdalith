@@ -2,6 +2,18 @@
 	"name": "lambda-router-poc",
 	"description": "Lambda Router PoC",
 	"version": "0.1.0",
+	"author": "Elias Brange",
+	"keywords": [
+		"aws",
+		"lambda",
+		"events",
+		"router",
+		"sqs",
+		"sns",
+		"eventbridge",
+		"dynamodb",
+		"serverless"
+	],
 	"type": "module",
 	"files": [
 		"dist"
