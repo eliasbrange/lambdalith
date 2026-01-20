@@ -5,12 +5,12 @@ A lightweight, type-safe event router for AWS Lambda functions. Route SQS, SNS, 
 ## Features
 
 - 🔍 **Automatic event detection** – Identifies incoming event types without configuration
-- 📦 **Per-record processing** – Handles batch events record-by-record with partial failure support
+- 📦 **Per-record processing** – Handles batch events record-by-record in parallel or sequentially with partial failure support.
 - 🎯 **Route matching** – Filter by queue name, topic, source/detail-type, or table name
-- 🔄 **Sequential processing** – Optional ordered processing for FIFO queues
-- ⚠️ **Built-in error handling** – Global error and not-found handlers
-- 🪶 **Zero dependencies** – Only peer dependency is TypeScript (optional)
+- ⚠️ **Built-in error handling** – Handle errors and unmatched events with ease.
+- 🪶 **Lightweight** – Zero dependencies.
 - 🦺 **Full TypeScript support** – Strongly typed contexts with auto-completion
+- 🔧 **Middleware support** – COMING SOON!
 
 ## Installation
 
