@@ -7,11 +7,11 @@ import {
 } from './fixtures'
 
 describe('DynamoDB Streams routing', () => {
-	test('routes to insert with table match', async () => {
+	test('routes to table match', async () => {
 		const router = new EventRouter()
 		const handler = mock(() => {})
 
-		router.dynamodb({ tableName: 'orders-table', eventName: 'INSERT' }, handler)
+		router.dynamodb({ tableName: 'orders-table' }, handler)
 
 		const event = createDynamoDBEvent(
 			'orders-table',
@@ -24,11 +24,11 @@ describe('DynamoDB Streams routing', () => {
 		expect(handler).toHaveBeenCalledTimes(1)
 	})
 
-	test('routes to insert catch-all (any table)', async () => {
+	test('routes to catch-all (any table)', async () => {
 		const router = new EventRouter()
 		const handler = mock(() => {})
 
-		router.dynamodb({ eventName: 'INSERT' }, handler)
+		router.dynamodb(handler)
 
 		const event = createDynamoDBEvent('any-table', 'INSERT', {
 			pk: { S: 'order-123' },
@@ -38,56 +38,36 @@ describe('DynamoDB Streams routing', () => {
 		expect(handler).toHaveBeenCalledTimes(1)
 	})
 
-	test('routes to table-only match (all event names)', async () => {
+	test('handles all event types for matched table', async () => {
 		const router = new EventRouter()
-		const handler = mock(() => {})
+		const events: string[] = []
 
-		router.dynamodb({ tableName: 'orders-table' }, handler)
+		router.dynamodb({ tableName: 'orders-table' }, (c) => {
+			events.push(c.dynamodb.eventName)
+		})
 
-		const event = createDynamoDBEvent('orders-table', 'MODIFY', {
+		const insertEvent = createDynamoDBEvent('orders-table', 'INSERT', {
 			pk: { S: 'order-123' },
 		})
-		await router.handler()(event, mockLambdaContext)
-
-		expect(handler).toHaveBeenCalledTimes(1)
-	})
-
-	test('routes modify events correctly', async () => {
-		const router = new EventRouter()
-		const insertHandler = mock(() => {})
-		const modifyHandler = mock(() => {})
-
-		router.dynamodb({ eventName: 'INSERT' }, insertHandler)
-		router.dynamodb({ eventName: 'MODIFY' }, modifyHandler)
-
-		const event = createDynamoDBEvent('orders-table', 'MODIFY', {
+		const modifyEvent = createDynamoDBEvent('orders-table', 'MODIFY', {
 			pk: { S: 'order-123' },
 		})
-		await router.handler()(event, mockLambdaContext)
-
-		expect(modifyHandler).toHaveBeenCalledTimes(1)
-		expect(insertHandler).not.toHaveBeenCalled()
-	})
-
-	test('routes remove events correctly', async () => {
-		const router = new EventRouter()
-		const handler = mock(() => {})
-
-		router.dynamodb({ tableName: 'orders-table', eventName: 'REMOVE' }, handler)
-
-		const event = createDynamoDBEvent('orders-table', 'REMOVE', {
+		const removeEvent = createDynamoDBEvent('orders-table', 'REMOVE', {
 			pk: { S: 'order-123' },
 		})
-		await router.handler()(event, mockLambdaContext)
 
-		expect(handler).toHaveBeenCalledTimes(1)
+		await router.handler()(insertEvent, mockLambdaContext)
+		await router.handler()(modifyEvent, mockLambdaContext)
+		await router.handler()(removeEvent, mockLambdaContext)
+
+		expect(events).toEqual(['INSERT', 'MODIFY', 'REMOVE'])
 	})
 
 	test('unmarshalls DynamoDB data correctly', async () => {
 		const router = new EventRouter()
 		let capturedKeys: unknown
 
-		router.dynamodb({ tableName: 'orders-table', eventName: 'INSERT' }, (c) => {
+		router.dynamodb({ tableName: 'orders-table' }, (c) => {
 			capturedKeys = c.dynamodb.keys
 		})
 
@@ -108,7 +88,7 @@ describe('DynamoDB Streams routing', () => {
 		const order: string[] = []
 
 		router.dynamodb(
-			{ tableName: 'orders-table', eventName: 'INSERT', sequential: true },
+			{ tableName: 'orders-table', sequential: true },
 			async (c) => {
 				const id = c.dynamodb.eventId
 				order.push(`start-${id}`)
@@ -138,16 +118,13 @@ describe('DynamoDB Streams routing', () => {
 		const router = new EventRouter()
 		const processed: string[] = []
 
-		router.dynamodb(
-			{ tableName: 'orders-table', eventName: 'INSERT', sequential: true },
-			(c) => {
-				const id = c.dynamodb.eventId
-				if (id === 'evt-2') {
-					throw new Error('Intentional failure')
-				}
-				processed.push(id)
-			},
-		)
+		router.dynamodb({ tableName: 'orders-table', sequential: true }, (c) => {
+			const id = c.dynamodb.eventId
+			if (id === 'evt-2') {
+				throw new Error('Intentional failure')
+			}
+			processed.push(id)
+		})
 
 		const event = createDynamoDBBatchEvent('orders-table', 'INSERT', [
 			{ eventId: 'evt-1', keys: { pk: { S: '1' } } },

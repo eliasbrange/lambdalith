@@ -131,7 +131,6 @@ export interface EventBridgeMatchOptions {
 
 export interface DynamoDBMatchOptions {
 	tableName?: string
-	eventName?: 'INSERT' | 'MODIFY' | 'REMOVE'
 	sequential?: boolean
 }
 

@@ -66,7 +66,7 @@ export class DynamoDBRouter {
 	private isSequential(firstRecord: DynamoDBRecord | undefined): boolean {
 		if (!firstRecord) return false
 		const table = parseTableName(firstRecord.eventSourceARN)
-		const route = this.matchRoute(table, firstRecord.eventName)
+		const route = this.matchRoute(table)
 		return route?.options?.sequential === true
 	}
 
@@ -129,7 +129,7 @@ export class DynamoDBRouter {
 		notFoundHandler?: NotFoundHandler,
 	): Promise<void> {
 		const table = parseTableName(record.eventSourceARN)
-		const route = this.matchRoute(table, record.eventName)
+		const route = this.matchRoute(table)
 
 		if (!route) {
 			if (notFoundHandler) {
@@ -153,17 +153,12 @@ export class DynamoDBRouter {
 
 	private matchRoute(
 		table: string,
-		eventName: string,
 	): Route<DynamoDBHandler, DynamoDBMatchOptions | undefined> | undefined {
 		for (const route of this.routes) {
 			if (!route.options) {
 				return route
 			}
-			const tableMatch =
-				!route.options.tableName || route.options.tableName === table
-			const eventNameMatch =
-				!route.options.eventName || route.options.eventName === eventName
-			if (tableMatch && eventNameMatch) {
+			if (!route.options.tableName || route.options.tableName === table) {
 				return route
 			}
 		}

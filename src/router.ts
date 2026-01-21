@@ -119,14 +119,11 @@ export class EventRouter {
 	 * // Catch-all
 	 * router.dynamodb(handler)
 	 *
-	 * // Specific table, all events
+	 * // Specific table
 	 * router.dynamodb({ tableName: 'orders' }, handler)
 	 *
-	 * // Specific event type
-	 * router.dynamodb({ eventName: 'INSERT' }, handler)
-	 *
-	 * // Specific table and event type
-	 * router.dynamodb({ tableName: 'orders', eventName: 'INSERT' }, handler)
+	 * // Sequential processing
+	 * router.dynamodb({ tableName: 'orders', sequential: true }, handler)
 	 */
 	dynamodb(handler: DynamoDBHandler): this
 	dynamodb(options: DynamoDBMatchOptions, handler: DynamoDBHandler): this
