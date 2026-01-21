@@ -135,11 +135,6 @@ export interface DynamoDBMatchOptions {
 	sequential?: boolean
 }
 
-export interface DynamoDBTableOptions {
-	tableName: string
-	sequential?: boolean
-}
-
 // Route types
 export interface Route<THandler, TOptions = undefined> {
 	options: TOptions

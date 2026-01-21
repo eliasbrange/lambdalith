@@ -8,7 +8,7 @@ import {
 } from './routers/index.ts'
 import type {
 	DynamoDBHandler,
-	DynamoDBTableOptions,
+	DynamoDBMatchOptions,
 	ErrorHandler,
 	EventBridgeHandler,
 	EventBridgeMatchOptions,
@@ -18,19 +18,6 @@ import type {
 	SQSHandler,
 	SQSMatchOptions,
 } from './types.ts'
-
-type DynamoDBEventMethod = {
-	(handler: DynamoDBHandler): EventRouter
-	(options: DynamoDBTableOptions, handler: DynamoDBHandler): EventRouter
-}
-
-type DynamoDBRouterAccessor = {
-	(handler: DynamoDBHandler): EventRouter
-	(options: DynamoDBTableOptions, handler: DynamoDBHandler): EventRouter
-	insert: DynamoDBEventMethod
-	modify: DynamoDBEventMethod
-	remove: DynamoDBEventMethod
-}
 
 export class EventRouter {
 	private sqsRouter = new SqsRouter()
@@ -136,31 +123,23 @@ export class EventRouter {
 	 * router.dynamodb({ tableName: 'orders' }, handler)
 	 *
 	 * // Specific event type
-	 * router.dynamodb.insert(handler)
-	 * router.dynamodb.insert({ tableName: 'orders' }, handler)
+	 * router.dynamodb({ eventName: 'INSERT' }, handler)
+	 *
+	 * // Specific table and event type
+	 * router.dynamodb({ tableName: 'orders', eventName: 'INSERT' }, handler)
 	 */
-	get dynamodb(): DynamoDBRouterAccessor {
-		const createMethod = (
-			method: 'add' | 'insert' | 'modify' | 'remove',
-		): DynamoDBEventMethod => {
-			return ((
-				optionsOrHandler: DynamoDBTableOptions | DynamoDBHandler,
-				handler?: DynamoDBHandler,
-			) => {
-				if (typeof optionsOrHandler === 'function') {
-					this.dynamodbRouter[method](optionsOrHandler)
-				} else if (handler) {
-					this.dynamodbRouter[method](optionsOrHandler, handler)
-				}
-				return this
-			}) as DynamoDBEventMethod
+	dynamodb(handler: DynamoDBHandler): this
+	dynamodb(options: DynamoDBMatchOptions, handler: DynamoDBHandler): this
+	dynamodb(
+		optionsOrHandler: DynamoDBMatchOptions | DynamoDBHandler,
+		handler?: DynamoDBHandler,
+	): this {
+		if (typeof optionsOrHandler === 'function') {
+			this.dynamodbRouter.add(optionsOrHandler)
+		} else if (handler) {
+			this.dynamodbRouter.add(optionsOrHandler, handler)
 		}
-
-		return Object.assign(createMethod('add'), {
-			insert: createMethod('insert'),
-			modify: createMethod('modify'),
-			remove: createMethod('remove'),
-		}) as DynamoDBRouterAccessor
+		return this
 	}
 
 	/**

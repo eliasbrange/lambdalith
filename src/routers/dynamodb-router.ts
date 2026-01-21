@@ -12,7 +12,6 @@ import {
 import type {
 	DynamoDBHandler,
 	DynamoDBMatchOptions,
-	DynamoDBTableOptions,
 	ErrorHandler,
 	NotFoundHandler,
 	Route,
@@ -24,60 +23,15 @@ export class DynamoDBRouter {
 		[]
 
 	add(handler: DynamoDBHandler): void
-	add(options: DynamoDBTableOptions, handler: DynamoDBHandler): void
+	add(options: DynamoDBMatchOptions, handler: DynamoDBHandler): void
 	add(
-		optionsOrHandler: DynamoDBTableOptions | DynamoDBHandler,
-		handler?: DynamoDBHandler,
-	): void {
-		this.addRoute(undefined, optionsOrHandler, handler)
-	}
-
-	insert(handler: DynamoDBHandler): void
-	insert(options: DynamoDBTableOptions, handler: DynamoDBHandler): void
-	insert(
-		optionsOrHandler: DynamoDBTableOptions | DynamoDBHandler,
-		handler?: DynamoDBHandler,
-	): void {
-		this.addRoute('INSERT', optionsOrHandler, handler)
-	}
-
-	modify(handler: DynamoDBHandler): void
-	modify(options: DynamoDBTableOptions, handler: DynamoDBHandler): void
-	modify(
-		optionsOrHandler: DynamoDBTableOptions | DynamoDBHandler,
-		handler?: DynamoDBHandler,
-	): void {
-		this.addRoute('MODIFY', optionsOrHandler, handler)
-	}
-
-	remove(handler: DynamoDBHandler): void
-	remove(options: DynamoDBTableOptions, handler: DynamoDBHandler): void
-	remove(
-		optionsOrHandler: DynamoDBTableOptions | DynamoDBHandler,
-		handler?: DynamoDBHandler,
-	): void {
-		this.addRoute('REMOVE', optionsOrHandler, handler)
-	}
-
-	private addRoute(
-		eventName: 'INSERT' | 'MODIFY' | 'REMOVE' | undefined,
-		optionsOrHandler: DynamoDBTableOptions | DynamoDBHandler,
+		optionsOrHandler: DynamoDBMatchOptions | DynamoDBHandler,
 		handler?: DynamoDBHandler,
 	): void {
 		if (typeof optionsOrHandler === 'function') {
-			this.routes.push({
-				options: eventName ? { eventName } : undefined,
-				handler: optionsOrHandler,
-			})
+			this.routes.push({ options: undefined, handler: optionsOrHandler })
 		} else if (handler) {
-			this.routes.push({
-				options: {
-					tableName: optionsOrHandler.tableName,
-					eventName,
-					sequential: optionsOrHandler.sequential,
-				},
-				handler,
-			})
+			this.routes.push({ options: optionsOrHandler, handler })
 		}
 	}
 
