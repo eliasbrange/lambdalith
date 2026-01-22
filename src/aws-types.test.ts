@@ -7,7 +7,7 @@
  */
 
 import type * as Official from 'aws-lambda'
-import type * as Custom from '../src/aws-types'
+import type * as Custom from './aws-types'
 
 // Type assertion helper - if U is not assignable to T, this will error
 type AssertAssignable<T, U extends T> = U
