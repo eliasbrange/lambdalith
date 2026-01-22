@@ -5,7 +5,7 @@ import type {
 	LambdaContext,
 	SNSEvent,
 	SQSEvent,
-} from '../src'
+} from '../src/aws-types'
 
 // Mock Lambda context
 export const mockLambdaContext: LambdaContext = {
