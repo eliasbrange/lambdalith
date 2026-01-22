@@ -14,18 +14,12 @@ import type {
 	NotFoundHandler,
 	SQSHandler,
 	SQSOptions,
+	SQSRoute,
 } from '../types.ts'
 import { parseQueueName } from '../utils.ts'
+import { BatchRouter } from './batch-router.ts'
 
-interface SQSRoute {
-	queueName: string | undefined
-	options: SQSOptions | undefined
-	handler: SQSHandler
-}
-
-export class SqsRouter {
-	private routes: SQSRoute[] = []
-
+export class SqsRouter extends BatchRouter<SQSRecord, SQSRoute> {
 	add(handler: SQSHandler): void
 	add(handler: SQSHandler, options: SQSOptions): void
 	add(queueName: string, handler: SQSHandler): void
@@ -40,108 +34,44 @@ export class SqsRouter {
 			const opts =
 				typeof handlerOrOptions === 'object' ? handlerOrOptions : undefined
 			this.routes.push({
-				queueName: undefined,
+				matcher: undefined,
 				options: opts,
 				handler: queueNameOrHandler,
 			})
 		} else {
 			// add(queueName, handler) or add(queueName, handler, options)
 			this.routes.push({
-				queueName: queueNameOrHandler,
+				matcher: queueNameOrHandler,
 				options,
 				handler: handlerOrOptions as SQSHandler,
 			})
 		}
 	}
 
-	async handle(
+	async handleEvent(
 		event: SQSEvent,
 		lambdaContext: LambdaContext,
 		errorHandler?: ErrorHandler,
 		notFoundHandler?: NotFoundHandler,
 	): Promise<BatchResponse> {
-		const firstRecord = event.Records[0]
-		const isSequential = this.isSequential(firstRecord)
-
-		const failures = isSequential
-			? await this.processSequentially(
-					event.Records,
-					lambdaContext,
-					errorHandler,
-					notFoundHandler,
-				)
-			: await this.processInParallel(
-					event.Records,
-					lambdaContext,
-					errorHandler,
-					notFoundHandler,
-				)
-
-		return {
-			batchItemFailures: failures.map((id) => ({ itemIdentifier: id })),
-		}
-	}
-
-	private isSequential(firstRecord: SQSRecord | undefined): boolean {
-		if (!firstRecord) return false
-		const queue = parseQueueName(firstRecord.eventSourceARN)
-		const route = this.matchRoute(queue)
-		return route?.options?.sequential === true
-	}
-
-	private async processSequentially(
-		records: SQSRecord[],
-		lambdaContext: LambdaContext,
-		errorHandler?: ErrorHandler,
-		notFoundHandler?: NotFoundHandler,
-	): Promise<string[]> {
-		for (let i = 0; i < records.length; i++) {
-			const record = records[i]
-			if (!record) continue
-			try {
-				await this.processRecord(
-					record,
-					lambdaContext,
-					errorHandler,
-					notFoundHandler,
-				)
-			} catch {
-				return records.slice(i).map((r) => r.messageId)
-			}
-		}
-		return []
-	}
-
-	private async processInParallel(
-		records: SQSRecord[],
-		lambdaContext: LambdaContext,
-		errorHandler?: ErrorHandler,
-		notFoundHandler?: NotFoundHandler,
-	): Promise<string[]> {
-		const results = await Promise.allSettled(
-			records.map((record) =>
-				this.processRecord(
-					record,
-					lambdaContext,
-					errorHandler,
-					notFoundHandler,
-				),
-			),
+		return this.handle(
+			event.Records,
+			lambdaContext,
+			errorHandler,
+			notFoundHandler,
 		)
-
-		const failures: string[] = []
-		for (let i = 0; i < results.length; i++) {
-			if (results[i]?.status === 'rejected') {
-				const record = records[i]
-				if (record) {
-					failures.push(record.messageId)
-				}
-			}
-		}
-		return failures
 	}
 
-	private async processRecord(
+	protected getRecordId(record: SQSRecord): string {
+		return record.messageId
+	}
+
+	protected findRouteForRecord(record: SQSRecord): SQSRoute | undefined {
+		const queue = parseQueueName(record.eventSourceARN)
+		return this.matchRoute(queue)
+	}
+
+	protected async processRecord(
 		record: SQSRecord,
 		lambdaContext: LambdaContext,
 		errorHandler?: ErrorHandler,
@@ -172,7 +102,7 @@ export class SqsRouter {
 
 	private matchRoute(queue: string): SQSRoute | undefined {
 		for (const route of this.routes) {
-			if (!route.queueName || route.queueName === queue) {
+			if (!route.matcher || route.matcher === queue) {
 				return route
 			}
 		}

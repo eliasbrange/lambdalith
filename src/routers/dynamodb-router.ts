@@ -12,20 +12,14 @@ import {
 import type {
 	DynamoDBHandler,
 	DynamoDBOptions,
+	DynamoDBRoute,
 	ErrorHandler,
 	NotFoundHandler,
 } from '../types.ts'
 import { parseTableName } from '../utils.ts'
+import { BatchRouter } from './batch-router.ts'
 
-interface DynamoDBRoute {
-	tableName: string | undefined
-	options: DynamoDBOptions | undefined
-	handler: DynamoDBHandler
-}
-
-export class DynamoDBRouter {
-	private routes: DynamoDBRoute[] = []
-
+export class DynamoDBRouter extends BatchRouter<DynamoDBRecord, DynamoDBRoute> {
 	add(handler: DynamoDBHandler): void
 	add(handler: DynamoDBHandler, options: DynamoDBOptions): void
 	add(tableName: string, handler: DynamoDBHandler): void
@@ -44,108 +38,46 @@ export class DynamoDBRouter {
 			const opts =
 				typeof handlerOrOptions === 'object' ? handlerOrOptions : undefined
 			this.routes.push({
-				tableName: undefined,
+				matcher: undefined,
 				options: opts,
 				handler: tableNameOrHandler,
 			})
 		} else {
 			// add(tableName, handler) or add(tableName, handler, options)
 			this.routes.push({
-				tableName: tableNameOrHandler,
+				matcher: tableNameOrHandler,
 				options,
 				handler: handlerOrOptions as DynamoDBHandler,
 			})
 		}
 	}
 
-	async handle(
+	async handleEvent(
 		event: DynamoDBStreamEvent,
 		lambdaContext: LambdaContext,
 		errorHandler?: ErrorHandler,
 		notFoundHandler?: NotFoundHandler,
 	): Promise<BatchResponse> {
-		const firstRecord = event.Records[0]
-		const isSequential = this.isSequential(firstRecord)
-
-		const failures = isSequential
-			? await this.processSequentially(
-					event.Records,
-					lambdaContext,
-					errorHandler,
-					notFoundHandler,
-				)
-			: await this.processInParallel(
-					event.Records,
-					lambdaContext,
-					errorHandler,
-					notFoundHandler,
-				)
-
-		return {
-			batchItemFailures: failures.map((id) => ({ itemIdentifier: id })),
-		}
-	}
-
-	private isSequential(firstRecord: DynamoDBRecord | undefined): boolean {
-		if (!firstRecord) return false
-		const table = parseTableName(firstRecord.eventSourceARN)
-		const route = this.matchRoute(table)
-		return route?.options?.sequential === true
-	}
-
-	private async processSequentially(
-		records: DynamoDBRecord[],
-		lambdaContext: LambdaContext,
-		errorHandler?: ErrorHandler,
-		notFoundHandler?: NotFoundHandler,
-	): Promise<string[]> {
-		for (let i = 0; i < records.length; i++) {
-			const record = records[i]
-			if (!record) continue
-			try {
-				await this.processRecord(
-					record,
-					lambdaContext,
-					errorHandler,
-					notFoundHandler,
-				)
-			} catch {
-				return records.slice(i).map((r) => r.eventID)
-			}
-		}
-		return []
-	}
-
-	private async processInParallel(
-		records: DynamoDBRecord[],
-		lambdaContext: LambdaContext,
-		errorHandler?: ErrorHandler,
-		notFoundHandler?: NotFoundHandler,
-	): Promise<string[]> {
-		const results = await Promise.allSettled(
-			records.map((record) =>
-				this.processRecord(
-					record,
-					lambdaContext,
-					errorHandler,
-					notFoundHandler,
-				),
-			),
+		return this.handle(
+			event.Records,
+			lambdaContext,
+			errorHandler,
+			notFoundHandler,
 		)
-
-		const failures: string[] = []
-		for (let i = 0; i < results.length; i++) {
-			if (results[i]?.status === 'rejected') {
-				const record = records[i]
-				if (record) {
-					failures.push(record.eventID)
-				}
-			}
-		}
-		return failures
 	}
 
-	private async processRecord(
+	protected getRecordId(record: DynamoDBRecord): string {
+		return record.eventID
+	}
+
+	protected findRouteForRecord(
+		record: DynamoDBRecord,
+	): DynamoDBRoute | undefined {
+		const table = parseTableName(record.eventSourceARN)
+		return this.matchRoute(table)
+	}
+
+	protected async processRecord(
 		record: DynamoDBRecord,
 		lambdaContext: LambdaContext,
 		errorHandler?: ErrorHandler,
@@ -176,7 +108,7 @@ export class DynamoDBRouter {
 
 	private matchRoute(table: string): DynamoDBRoute | undefined {
 		for (const route of this.routes) {
-			if (!route.tableName || route.tableName === table) {
+			if (!route.matcher || route.matcher === table) {
 				return route
 			}
 		}

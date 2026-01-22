@@ -4,13 +4,13 @@ import {
 	createNotFoundContext,
 	createSNSContext,
 } from '../contexts.ts'
-import type { ErrorHandler, NotFoundHandler, SNSHandler } from '../types.ts'
+import type {
+	ErrorHandler,
+	NotFoundHandler,
+	SNSHandler,
+	SNSRoute,
+} from '../types.ts'
 import { parseTopicName } from '../utils.ts'
-
-interface SNSRoute {
-	topicName: string | undefined
-	handler: SNSHandler
-}
 
 export class SnsRouter {
 	private routes: SNSRoute[] = []
@@ -19,9 +19,9 @@ export class SnsRouter {
 	add(topicName: string, handler: SNSHandler): void
 	add(topicNameOrHandler: string | SNSHandler, handler?: SNSHandler): void {
 		if (typeof topicNameOrHandler === 'function') {
-			this.routes.push({ topicName: undefined, handler: topicNameOrHandler })
+			this.routes.push({ matcher: undefined, handler: topicNameOrHandler })
 		} else if (handler) {
-			this.routes.push({ topicName: topicNameOrHandler, handler })
+			this.routes.push({ matcher: topicNameOrHandler, handler })
 		}
 	}
 
@@ -74,7 +74,7 @@ export class SnsRouter {
 
 	private matchRoute(topic: string): SNSRoute | undefined {
 		for (const route of this.routes) {
-			if (!route.topicName || route.topicName === topic) {
+			if (!route.matcher || route.matcher === topic) {
 				return route
 			}
 		}

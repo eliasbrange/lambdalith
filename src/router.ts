@@ -49,27 +49,11 @@ export class EventRouter {
 		handlerOrOptions?: SQSHandler | SQSOptions,
 		options?: SQSOptions,
 	): this {
-		if (typeof queueNameOrHandler === 'function') {
-			// sqs(handler) or sqs(handler, options)
-			const opts =
-				typeof handlerOrOptions === 'object' ? handlerOrOptions : undefined
-			if (opts) {
-				this.sqsRouter.add(queueNameOrHandler, opts)
-			} else {
-				this.sqsRouter.add(queueNameOrHandler)
-			}
-		} else {
-			// sqs(queueName, handler) or sqs(queueName, handler, options)
-			if (options) {
-				this.sqsRouter.add(
-					queueNameOrHandler,
-					handlerOrOptions as SQSHandler,
-					options,
-				)
-			} else {
-				this.sqsRouter.add(queueNameOrHandler, handlerOrOptions as SQSHandler)
-			}
-		}
+		;(this.sqsRouter.add as (...args: unknown[]) => void)(
+			queueNameOrHandler,
+			handlerOrOptions,
+			options,
+		)
 		return this
 	}
 
@@ -87,11 +71,10 @@ export class EventRouter {
 	sns(handler: SNSHandler): this
 	sns(topicName: string, handler: SNSHandler): this
 	sns(topicNameOrHandler: string | SNSHandler, handler?: SNSHandler): this {
-		if (typeof topicNameOrHandler === 'function') {
-			this.snsRouter.add(topicNameOrHandler)
-		} else if (handler) {
-			this.snsRouter.add(topicNameOrHandler, handler)
-		}
+		;(this.snsRouter.add as (...args: unknown[]) => void)(
+			topicNameOrHandler,
+			handler,
+		)
 		return this
 	}
 
@@ -115,11 +98,10 @@ export class EventRouter {
 		optionsOrHandler: EventBridgeMatchOptions | EventBridgeHandler,
 		handler?: EventBridgeHandler,
 	): this {
-		if (typeof optionsOrHandler === 'function') {
-			this.eventBridgeRouter.add(optionsOrHandler)
-		} else if (handler) {
-			this.eventBridgeRouter.add(optionsOrHandler, handler)
-		}
+		;(this.eventBridgeRouter.add as (...args: unknown[]) => void)(
+			optionsOrHandler,
+			handler,
+		)
 		return this
 	}
 
@@ -150,30 +132,11 @@ export class EventRouter {
 		handlerOrOptions?: DynamoDBHandler | DynamoDBOptions,
 		options?: DynamoDBOptions,
 	): this {
-		if (typeof tableNameOrHandler === 'function') {
-			// dynamodb(handler) or dynamodb(handler, options)
-			const opts =
-				typeof handlerOrOptions === 'object' ? handlerOrOptions : undefined
-			if (opts) {
-				this.dynamodbRouter.add(tableNameOrHandler, opts)
-			} else {
-				this.dynamodbRouter.add(tableNameOrHandler)
-			}
-		} else {
-			// dynamodb(tableName, handler) or dynamodb(tableName, handler, options)
-			if (options) {
-				this.dynamodbRouter.add(
-					tableNameOrHandler,
-					handlerOrOptions as DynamoDBHandler,
-					options,
-				)
-			} else {
-				this.dynamodbRouter.add(
-					tableNameOrHandler,
-					handlerOrOptions as DynamoDBHandler,
-				)
-			}
-		}
+		;(this.dynamodbRouter.add as (...args: unknown[]) => void)(
+			tableNameOrHandler,
+			handlerOrOptions,
+			options,
+		)
 		return this
 	}
 
@@ -208,7 +171,7 @@ export class EventRouter {
 
 			switch (detected.type) {
 				case 'sqs':
-					return this.sqsRouter.handle(
+					return this.sqsRouter.handleEvent(
 						detected.event,
 						context,
 						this.errorHandler,
@@ -231,7 +194,7 @@ export class EventRouter {
 					)
 					return undefined
 				case 'dynamodb':
-					return this.dynamodbRouter.handle(
+					return this.dynamodbRouter.handleEvent(
 						detected.event,
 						context,
 						this.errorHandler,

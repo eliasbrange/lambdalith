@@ -128,9 +128,26 @@ export interface DynamoDBOptions {
 }
 
 // Route types
-export interface Route<THandler, TOptions = undefined> {
-	options: TOptions
-	handler: THandler
+export interface SQSRoute {
+	matcher: string | undefined
+	options: SQSOptions | undefined
+	handler: SQSHandler
+}
+
+export interface SNSRoute {
+	matcher: string | undefined
+	handler: SNSHandler
+}
+
+export interface EventBridgeRoute {
+	options: EventBridgeMatchOptions | undefined
+	handler: EventBridgeHandler
+}
+
+export interface DynamoDBRoute {
+	matcher: string | undefined
+	options: DynamoDBOptions | undefined
+	handler: DynamoDBHandler
 }
 
 // DynamoDB AttributeValue re-export for utils

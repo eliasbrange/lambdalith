@@ -8,15 +8,12 @@ import type {
 	ErrorHandler,
 	EventBridgeHandler,
 	EventBridgeMatchOptions,
+	EventBridgeRoute,
 	NotFoundHandler,
-	Route,
 } from '../types.ts'
 
 export class EventBridgeRouter {
-	private routes: Route<
-		EventBridgeHandler,
-		EventBridgeMatchOptions | undefined
-	>[] = []
+	private routes: EventBridgeRoute[] = []
 
 	add(handler: EventBridgeHandler): void
 	add(options: EventBridgeMatchOptions, handler: EventBridgeHandler): void
