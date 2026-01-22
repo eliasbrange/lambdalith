@@ -72,9 +72,9 @@ router.sqs((c) => {
 
 For SQS and DynamoDB Streams, the router automatically handles partial batch failures. Enable [ReportBatchItemFailures](https://docs.aws.amazon.com/lambda/latest/dg/services-ddb-batchfailurereporting.html) on your function to take advantage of this feature.
 
-**Default (parallel):** All records processed concurrently. Failed records reported individually.
+**Default (parallel):** All records process concurrently. Failed records reported individually.
 
-**Sequential:** Records processed one at a time. Stops processing on failure and marks remaining records as failed.
+**Sequential:** Records process one at a time. Stops processing on failure and marks remaining records as failed.
 
 ```typescript
 router.sqs('MyQueue.fifo', (c) => {
@@ -94,6 +94,10 @@ router.sqs((c) => {
 ```
 
 ## Error Handling
+
+For SQS and DynamoDB Streams, errors in a handler will not cause the Lambda function to fail. Instead, the router will respond with a `batchItemFailures` array containing the IDs of the failed records.
+
+For other types of events, errors in a handler will cause the Lambda function to fail.
 
 ```typescript
 // Called when a handler throws an error
