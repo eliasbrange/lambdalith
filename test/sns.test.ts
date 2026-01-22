@@ -28,4 +28,33 @@ describe('SNS routing', () => {
 
 		expect(capturedTopic).toBe('notifications')
 	})
+
+	test('routes to error handler when handler throws', async () => {
+		const router = new EventRouter()
+		const errorHandler = mock(() => {})
+
+		router.sns(() => {
+			throw new Error('Test error')
+		})
+		router.onError(errorHandler)
+
+		const event = createSNSEvent('any.queue', 'msg-1', { data: 'test' })
+		await expect(router.handler()(event, mockLambdaContext)).rejects.toThrow(
+			'Test error',
+		)
+
+		expect(errorHandler).toHaveBeenCalledTimes(1)
+	})
+
+	test('routes to not found handler when no handler is found', async () => {
+		const router = new EventRouter()
+		const notFoundHandler = mock(() => {})
+
+		router.notFound(notFoundHandler)
+
+		const event = createSNSEvent('any.queue', 'msg-1', { data: 'test' })
+		await router.handler()(event, mockLambdaContext)
+
+		expect(notFoundHandler).toHaveBeenCalledTimes(1)
+	})
 })

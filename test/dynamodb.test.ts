@@ -151,4 +151,33 @@ describe('DynamoDB Streams routing', () => {
 			],
 		})
 	})
+
+	test('routes to error handler when handler throws', async () => {
+		const router = new EventRouter()
+		const errorHandler = mock(() => {})
+
+		router.dynamodb(() => {
+			throw new Error('Test error')
+		})
+		router.onError(errorHandler)
+
+		const event = createDynamoDBEvent('any-table', 'INSERT', {})
+		await expect(router.handler()(event, mockLambdaContext)).rejects.toThrow(
+			'Test error',
+		)
+
+		expect(errorHandler).toHaveBeenCalledTimes(1)
+	})
+
+	test('routes to not found handler when no handler is found', async () => {
+		const router = new EventRouter()
+		const notFoundHandler = mock(() => {})
+
+		router.notFound(notFoundHandler)
+
+		const event = createDynamoDBEvent('any-table', 'INSERT', {})
+		await router.handler()(event, mockLambdaContext)
+
+		expect(notFoundHandler).toHaveBeenCalledTimes(1)
+	})
 })

@@ -232,4 +232,33 @@ describe('SQS routing', () => {
 			],
 		})
 	})
+
+	test('routes to error handler when handler throws', async () => {
+		const router = new EventRouter()
+		const errorHandler = mock(() => {})
+
+		router.sqs(() => {
+			throw new Error('Test error')
+		})
+		router.onError(errorHandler)
+
+		const event = createSQSEvent('any.queue', 'msg-1', { data: 'test' })
+		await expect(router.handler()(event, mockLambdaContext)).rejects.toThrow(
+			'Test error',
+		)
+
+		expect(errorHandler).toHaveBeenCalledTimes(1)
+	})
+
+	test('routes to not found handler when no handler is found', async () => {
+		const router = new EventRouter()
+		const notFoundHandler = mock(() => {})
+
+		router.notFound(notFoundHandler)
+
+		const event = createSQSEvent('any.queue', 'msg-1', { data: 'test' })
+		await router.handler()(event, mockLambdaContext)
+
+		expect(notFoundHandler).toHaveBeenCalledTimes(1)
+	})
 })
