@@ -1,4 +1,4 @@
-export { EventRouter } from './router.ts'
+export { EventRouter } from './router/index.ts'
 export type {
 	DynamoDBContext,
 	DynamoDBHandler,

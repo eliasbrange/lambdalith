@@ -1,11 +1,5 @@
-import type { BatchResponse, LambdaContext } from './aws-types.ts'
-import { detectEventType } from './detection.ts'
-import {
-	DynamoDBRouter,
-	EventBridgeRouter,
-	SnsRouter,
-	SqsRouter,
-} from './routers/index.ts'
+import type { BatchResponse, LambdaContext } from '../aws-types.ts'
+import { detectEventType } from '../detection.ts'
 import type {
 	DynamoDBHandler,
 	DynamoDBOptions,
@@ -16,7 +10,11 @@ import type {
 	SNSHandler,
 	SQSHandler,
 	SQSOptions,
-} from './types.ts'
+} from '../types.ts'
+import { DynamoDBRouter } from './dynamodb-router.ts'
+import { EventBridgeRouter } from './eventbridge-router.ts'
+import { SnsRouter } from './sns-router.ts'
+import { SqsRouter } from './sqs-router.ts'
 
 export class EventRouter {
 	private sqsRouter = new SqsRouter()
