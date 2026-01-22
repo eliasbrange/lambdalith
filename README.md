@@ -1,4 +1,4 @@
-# LambRoute
+# Lambdalith
 
 A lightweight, type-safe event router for AWS Lambda functions. Route SQS, SNS, EventBridge, and DynamoDB Streams events with a fluent API.
 
