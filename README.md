@@ -15,13 +15,13 @@ A lightweight, type-safe event router for AWS Lambda functions. Route SQS, SNS, 
 ## Installation
 
 ```bash
-npm install lambda-router-poc
+npm install lambdalith
 ```
 
 ## Quick Start
 
 ```typescript
-import { EventRouter } from 'lambda-router-poc';
+import { EventRouter } from 'lambdalith';
 
 const router = new EventRouter();
 

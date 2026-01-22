@@ -1,5 +1,5 @@
 {
-	"name": "lambda-router-poc",
+	"name": "lambdalith",
 	"description": "A tiny event router for AWS Lambda functions. Route SQS, SNS, EventBridge, and DynamoDB Streams events with a fluent API.",
 	"version": "0.1.0",
 	"author": "Elias Brange",
@@ -34,14 +34,14 @@
 		},
 		"./package.json": "./package.json"
 	},
-	"homepage": "https://github.com/eliasbrange/lambda-router-poc#readme",
+	"homepage": "https://github.com/eliasbrange/lambdalith#readme",
 	"bugs": {
-		"url": "https://github.com/eliasbrange/lambda-router-poc/issues"
+		"url": "https://github.com/eliasbrange/lambdalith/issues"
 	},
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/eliasbrange/lambda-router-poc.git"
+		"url": "git+https://github.com/eliasbrange/lambdalith.git"
 	},
 	"scripts": {
 		"build": "bunup",
