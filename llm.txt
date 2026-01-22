@@ -1,0 +1,433 @@
+# Lambdalith
+
+> A lightweight, type-safe event router for AWS Lambda functions. Route SQS, SNS, EventBridge, and DynamoDB Streams events with a fluent API.
+
+## Installation
+
+```bash
+npm install lambdalith
+```
+
+## Overview
+
+Lambdalith provides a single `EventRouter` class that automatically detects incoming AWS event types and routes them to registered handlers. It has zero dependencies and full TypeScript support.
+
+**Supported event sources:**
+- SQS (Simple Queue Service)
+- SNS (Simple Notification Service)
+- EventBridge
+- DynamoDB Streams
+
+## Quick Start
+
+```typescript
+import { EventRouter } from 'lambdalith';
+
+const router = new EventRouter();
+
+router.sqs('MyQueue', (c) => {
+  console.log(c.sqs.body);
+});
+
+router.sns('MyTopic', (c) => {
+  console.log(c.sns.body);
+});
+
+router.event({ source: 'MyService', detailType: 'MyEvent' }, (c) => {
+  console.log(c.event.detail);
+});
+
+router.dynamodb('MyTable', (c) => {
+  console.log(c.dynamodb.newImage);
+});
+
+router.onError((error, c) => {
+  console.error(error.message);
+});
+
+router.notFound((c) => {
+  console.warn('Unhandled', c.source);
+});
+
+export const handler = router.handler();
+```
+
+## API Reference
+
+### EventRouter
+
+The main class for routing events.
+
+#### `router.sqs(handler)`
+#### `router.sqs(queueName, handler)`
+#### `router.sqs(queueName, handler, options)`
+
+Register an SQS handler. Routes are matched in registration order (first match wins).
+
+**Parameters:**
+- `queueName` (optional): Queue name to match
+- `handler`: `(c: SQSContext) => void | Promise<void>`
+- `options` (optional): `{ sequential?: boolean }`
+
+**Examples:**
+```typescript
+// Catch-all
+router.sqs((c) => { /* handles all SQS messages */ });
+
+// Specific queue
+router.sqs('orders-queue', (c) => { /* handles orders-queue */ });
+
+// Sequential processing (for FIFO queues)
+router.sqs('orders-queue.fifo', (c) => { /* ... */ }, { sequential: true });
+```
+
+#### `router.sns(handler)`
+#### `router.sns(topicName, handler)`
+
+Register an SNS handler.
+
+**Parameters:**
+- `topicName` (optional): Topic name to match
+- `handler`: `(c: SNSContext) => void | Promise<void>`
+
+**Examples:**
+```typescript
+// Catch-all
+router.sns((c) => { /* handles all SNS messages */ });
+
+// Specific topic
+router.sns('orders-topic', (c) => { /* handles orders-topic */ });
+```
+
+#### `router.event(handler)`
+#### `router.event(options, handler)`
+
+Register an EventBridge handler.
+
+**Parameters:**
+- `options` (optional): `{ source?: string, detailType?: string }`
+- `handler`: `(c: EventBridgeContext) => void | Promise<void>`
+
+**Examples:**
+```typescript
+// Catch-all
+router.event((c) => { /* handles all EventBridge events */ });
+
+// Specific source
+router.event({ source: 'orders.service' }, (c) => { /* ... */ });
+
+// Specific source and detail type
+router.event({ source: 'orders.service', detailType: 'OrderCreated' }, (c) => { /* ... */ });
+```
+
+#### `router.dynamodb(handler)`
+#### `router.dynamodb(tableName, handler)`
+#### `router.dynamodb(tableName, handler, options)`
+
+Register a DynamoDB Streams handler.
+
+**Parameters:**
+- `tableName` (optional): Table name to match
+- `handler`: `(c: DynamoDBContext) => void | Promise<void>`
+- `options` (optional): `{ sequential?: boolean }`
+
+**Examples:**
+```typescript
+// Catch-all
+router.dynamodb((c) => { /* handles all DynamoDB stream records */ });
+
+// Specific table
+router.dynamodb('orders', (c) => { /* handles orders table */ });
+
+// Sequential processing
+router.dynamodb('orders', (c) => { /* ... */ }, { sequential: true });
+```
+
+#### `router.notFound(handler)`
+
+Register a handler for unmatched events.
+
+```typescript
+router.notFound((c) => {
+  console.warn('Unhandled:', c.source);
+  console.log(c.raw); // Raw event/record
+});
+```
+
+#### `router.onError(handler)`
+
+Register an error handler.
+
+```typescript
+router.onError((error, c) => {
+  console.error(error.message);
+  console.log(c.source); // 'sqs' | 'sns' | 'event' | 'dynamodb'
+  console.log(c.raw);    // Raw event/record
+});
+```
+
+#### `router.use(middleware)`
+#### `router.use(filter, middleware)`
+
+Register middleware that runs for each record in onion-style order.
+
+**Parameters:**
+- `filter` (optional): `'sqs' | 'sns' | 'event' | 'dynamodb'`
+- `middleware`: `(c: Context, next: Next) => void | Promise<void>`
+
+**Examples:**
+```typescript
+// Global middleware (all event types)
+router.use(async (c, next) => {
+  console.log('before');
+  await next();
+  console.log('after');
+});
+
+// Event-type specific middleware
+router.use('sqs', async (c, next) => {
+  // Only runs for SQS events
+  await next();
+});
+```
+
+#### `router.handler()`
+
+Create the Lambda handler function.
+
+```typescript
+export const handler = router.handler();
+```
+
+## Context Objects
+
+Each handler receives a context object with event-specific data.
+
+### SQSContext
+
+```typescript
+interface SQSContext {
+  source: 'sqs';
+  lambda: LambdaContext;
+  raw: unknown;
+  sqs: {
+    queue: string;
+    body: unknown;                    // Parsed JSON body
+    messageId: string;
+    receiptHandle: string;
+    sentTimestamp: Date;
+    approximateReceiveCount: number;
+    messageGroupId: string | undefined;
+    messageDeduplicationId: string | undefined;
+    attributes: Record<string, string>;
+    raw: SQSRecord;
+    attribute(name: string): string | undefined;
+  };
+  get<T>(key: string): T | undefined;  // Get custom data
+  set(key: string, value: unknown): void;  // Set custom data
+}
+```
+
+### SNSContext
+
+```typescript
+interface SNSContext {
+  source: 'sns';
+  lambda: LambdaContext;
+  raw: unknown;
+  sns: {
+    topic: string;
+    topicArn: string;
+    body: unknown;                    // Parsed JSON body
+    messageId: string;
+    subject: string | undefined;
+    timestamp: Date;
+    attributes: Record<string, string>;
+    raw: SNSEventRecord;
+    attribute(name: string): string | undefined;
+  };
+  get<T>(key: string): T | undefined;
+  set(key: string, value: unknown): void;
+}
+```
+
+### EventBridgeContext
+
+```typescript
+interface EventBridgeContext {
+  source: 'event';
+  lambda: LambdaContext;
+  raw: unknown;
+  event: {
+    source: string;
+    detailType: string;
+    detail: unknown;                  // Parsed detail object
+    id: string;
+    account: string;
+    region: string;
+    time: Date;
+    resources: string[];
+    raw: EventBridgeEvent;
+  };
+  get<T>(key: string): T | undefined;
+  set(key: string, value: unknown): void;
+}
+```
+
+### DynamoDBContext
+
+```typescript
+interface DynamoDBContext {
+  source: 'dynamodb';
+  lambda: LambdaContext;
+  raw: unknown;
+  dynamodb: {
+    table: string;
+    eventName: 'INSERT' | 'MODIFY' | 'REMOVE';
+    keys: Record<string, unknown>;
+    newImage: Record<string, unknown> | undefined;
+    oldImage: Record<string, unknown> | undefined;
+    eventId: string;
+    sequenceNumber: string;
+    streamArn: string;
+    raw: DynamoDBRecord;
+  };
+  get<T>(key: string): T | undefined;
+  set(key: string, value: unknown): void;
+}
+```
+
+## Route Matching
+
+Routes are matched in registration order – the first matching route wins. Register specific routes before catch-alls:
+
+```typescript
+router.sqs('SpecificQueue', (c) => {
+  // Will match the specific queue
+});
+router.sqs((c) => {
+  // Will match any other queue
+});
+```
+
+## Batch Processing
+
+For SQS and DynamoDB Streams, the router automatically handles partial batch failures. Enable `ReportBatchItemFailures` on your Lambda function to take advantage of this feature.
+
+**Default (parallel):** All records process concurrently. Failed records are reported individually.
+
+**Sequential:** Records process one at a time. Stops processing on failure and marks remaining records as failed.
+
+```typescript
+router.sqs('MyQueue.fifo', (c) => {
+  // Processes messages sequentially
+}, { sequential: true });
+```
+
+## Error Handling
+
+For SQS and DynamoDB Streams, errors in a handler will not cause the Lambda function to fail. Instead, the router returns a `batchItemFailures` array containing the IDs of failed records.
+
+For SNS and EventBridge events, errors in a handler will cause the Lambda function to fail.
+
+## Middleware
+
+Middleware runs for each record in onion-style order:
+
+```
+middleware1 (before)
+    middleware2 (before)
+        handler
+    middleware2 (after)
+middleware1 (after)
+```
+
+If `next()` is not called, processing auto-continues to the next middleware/handler.
+
+## Exported Types
+
+```typescript
+import type {
+  AnyContext,
+  DynamoDBContext,
+  DynamoDBHandler,
+  DynamoDBMiddleware,
+  ErrorContext,
+  ErrorHandler,
+  EventBridgeContext,
+  EventBridgeHandler,
+  EventBridgeMiddleware,
+  EventSource,
+  Middleware,
+  Next,
+  NotFoundContext,
+  NotFoundHandler,
+  SNSContext,
+  SNSHandler,
+  SNSMiddleware,
+  SQSContext,
+  SQSHandler,
+  SQSMiddleware,
+} from 'lambdalith';
+```
+
+## Complete Example
+
+```typescript
+import { EventRouter } from 'lambdalith';
+
+const router = new EventRouter();
+
+// Middleware for logging
+router.use(async (c, next) => {
+  console.log(`Processing ${c.source} event`);
+  const start = Date.now();
+  await next();
+  console.log(`Completed in ${Date.now() - start}ms`);
+});
+
+// SQS handlers
+router.sqs('orders-queue', async (c) => {
+  const order = c.sqs.body as { orderId: string; amount: number };
+  console.log(`Processing order ${order.orderId}`);
+});
+
+router.sqs('notifications-queue.fifo', async (c) => {
+  // Sequential processing for FIFO queue
+  console.log(`Notification: ${c.sqs.messageId}`);
+}, { sequential: true });
+
+// SNS handler
+router.sns('alerts-topic', (c) => {
+  console.log(`Alert: ${c.sns.body}`);
+});
+
+// EventBridge handlers
+router.event({ source: 'orders.service', detailType: 'OrderCreated' }, (c) => {
+  console.log(`New order: ${JSON.stringify(c.event.detail)}`);
+});
+
+router.event({ source: 'orders.service' }, (c) => {
+  // Catch-all for orders.service events
+  console.log(`Orders event: ${c.event.detailType}`);
+});
+
+// DynamoDB Streams handler
+router.dynamodb('users', (c) => {
+  if (c.dynamodb.eventName === 'INSERT') {
+    console.log('New user:', c.dynamodb.newImage);
+  }
+});
+
+// Error handling
+router.onError((error, c) => {
+  console.error(`Error in ${c.source} handler:`, error.message);
+});
+
+// Catch-all for unhandled events
+router.notFound((c) => {
+  console.warn(`No handler for ${c.source} event`);
+});
+
+export const handler = router.handler();
+```
