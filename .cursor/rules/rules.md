@@ -35,6 +35,11 @@
 - Test file naming: `*.test.ts`
 - Test behavior, not implementation details
 
+## Documentation
+
+- Keep `README.md` in sync with code changes
+- Update examples when APIs change
+
 ## Commands
 
 - `bun run lint` / `bun run lint:fix` - Linting
