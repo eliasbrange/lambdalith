@@ -90,4 +90,32 @@ describe('EventBridge routing', () => {
 			detail: { userId: '123' },
 		})
 	})
+	test('routes to error handler when handler throws', async () => {
+		const router = new EventRouter()
+		const errorHandler = mock(() => {})
+
+		router.event(() => {
+			throw new Error('Test error')
+		})
+		router.onError(errorHandler)
+
+		const event = createEventBridgeEvent('any.source', 'AnyType', {})
+		await expect(router.handler()(event, mockLambdaContext)).rejects.toThrow(
+			'Test error',
+		)
+
+		expect(errorHandler).toHaveBeenCalledTimes(1)
+	})
+
+	test('routes to not found handler when no handler is found', async () => {
+		const router = new EventRouter()
+		const notFoundHandler = mock(() => {})
+
+		router.notFound(notFoundHandler)
+
+		const event = createEventBridgeEvent('any.source', 'AnyType', {})
+		await router.handler()(event, mockLambdaContext)
+
+		expect(notFoundHandler).toHaveBeenCalledTimes(1)
+	})
 })
