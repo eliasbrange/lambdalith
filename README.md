@@ -1,16 +1,18 @@
 # Lambdalith
 
+![Lambdalith](./assets/lambdalith.jpg)
+
 A lightweight, type-safe event router for AWS Lambda functions. Route SQS, SNS, EventBridge, and DynamoDB Streams events with a fluent API.
 
 ## Features
 
-- 🔍 **Automatic event detection** – Identifies incoming event types without configuration
+- 🔍 **Automatic event detection** – Identifies incoming event types without configuration.
 - 📦 **Per-record processing** – Handles batch events record-by-record in parallel or sequentially with partial failure support.
-- 🎯 **Route matching** – Filter by queue name, topic, source/detail-type, or table name
+- 🎯 **Route matching** – Filter by queue name, topic, source/detail-type, or table name.
 - ⚠️ **Built-in error handling** – Handle errors and unmatched events with ease.
+- 🦺 **Full TypeScript support** – Strongly typed contexts with auto-completion.
+- 🔧 **Middleware support** – Run middleware before and after handling each record.
 - 🪶 **Lightweight** – Zero dependencies.
-- 🦺 **Full TypeScript support** – Strongly typed contexts with auto-completion
-- 🔧 **Middleware support** – COMING SOON!
 
 ## Installation
 
@@ -46,7 +48,7 @@ router.onError((error, c) => {
 });
 
 router.notFound((c) => {
-  console.warn('Unhandled:', c.source);
+  console.warn('Unhandled', c.source);
 });
 
 export const handler = router.handler();
@@ -108,6 +110,42 @@ router.notFound((c) => {
 });
 ```
 
+## Middleware
+
+Middleware runs for each record in onion-style order. The first registered middleware wraps the last:
+
+```
+middleware1
+    middleware2
+        handler
+    middleware2
+middleware1
+```
+
+Add a middleware to the router:
+
+```typescript
+router.use(async (c, next) => {
+  console.log('before');
+  await next();
+  console.log('after');
+});
+```
+
+Filter middleware by event type:
+
+```typescript
+router.use('sqs', async (c, next) => {
+  // Only runs for SQS events
+  await next();
+});
+
+router.use('sns', snsMiddleware);
+router.use('event', eventBridgeMiddleware);
+router.use('dynamodb', dynamodbMiddleware);
+```
+
+If `next()` is not called, processing auto-continues to the next middleware/handler.
 
 ## Contributing
 
