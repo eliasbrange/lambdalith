@@ -7,7 +7,7 @@ describe('SNS routing', () => {
 		const router = new EventRouter()
 		const handler = mock(() => {})
 
-		router.sns({ topicName: 'notifications' }, handler)
+		router.sns('notifications', handler)
 
 		const event = createSNSEvent('notifications', 'msg-1', { alert: 'test' })
 		await router.handler()(event, mockLambdaContext)
@@ -19,7 +19,7 @@ describe('SNS routing', () => {
 		const router = new EventRouter()
 		let capturedTopic: string | undefined
 
-		router.sns({ topicName: 'notifications' }, (c) => {
+		router.sns('notifications', (c) => {
 			capturedTopic = c.sns.topic
 		})
 

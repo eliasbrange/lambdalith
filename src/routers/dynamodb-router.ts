@@ -11,27 +11,50 @@ import {
 } from '../contexts.ts'
 import type {
 	DynamoDBHandler,
-	DynamoDBMatchOptions,
+	DynamoDBOptions,
 	ErrorHandler,
 	NotFoundHandler,
-	Route,
 } from '../types.ts'
 import { parseTableName } from '../utils.ts'
 
+interface DynamoDBRoute {
+	tableName: string | undefined
+	options: DynamoDBOptions | undefined
+	handler: DynamoDBHandler
+}
+
 export class DynamoDBRouter {
-	private routes: Route<DynamoDBHandler, DynamoDBMatchOptions | undefined>[] =
-		[]
+	private routes: DynamoDBRoute[] = []
 
 	add(handler: DynamoDBHandler): void
-	add(options: DynamoDBMatchOptions, handler: DynamoDBHandler): void
+	add(handler: DynamoDBHandler, options: DynamoDBOptions): void
+	add(tableName: string, handler: DynamoDBHandler): void
 	add(
-		optionsOrHandler: DynamoDBMatchOptions | DynamoDBHandler,
-		handler?: DynamoDBHandler,
+		tableName: string,
+		handler: DynamoDBHandler,
+		options: DynamoDBOptions,
+	): void
+	add(
+		tableNameOrHandler: string | DynamoDBHandler,
+		handlerOrOptions?: DynamoDBHandler | DynamoDBOptions,
+		options?: DynamoDBOptions,
 	): void {
-		if (typeof optionsOrHandler === 'function') {
-			this.routes.push({ options: undefined, handler: optionsOrHandler })
-		} else if (handler) {
-			this.routes.push({ options: optionsOrHandler, handler })
+		if (typeof tableNameOrHandler === 'function') {
+			// add(handler) or add(handler, options)
+			const opts =
+				typeof handlerOrOptions === 'object' ? handlerOrOptions : undefined
+			this.routes.push({
+				tableName: undefined,
+				options: opts,
+				handler: tableNameOrHandler,
+			})
+		} else {
+			// add(tableName, handler) or add(tableName, handler, options)
+			this.routes.push({
+				tableName: tableNameOrHandler,
+				options,
+				handler: handlerOrOptions as DynamoDBHandler,
+			})
 		}
 	}
 
@@ -151,14 +174,9 @@ export class DynamoDBRouter {
 		}
 	}
 
-	private matchRoute(
-		table: string,
-	): Route<DynamoDBHandler, DynamoDBMatchOptions | undefined> | undefined {
+	private matchRoute(table: string): DynamoDBRoute | undefined {
 		for (const route of this.routes) {
-			if (!route.options) {
-				return route
-			}
-			if (!route.options.tableName || route.options.tableName === table) {
+			if (!route.tableName || route.tableName === table) {
 				return route
 			}
 		}

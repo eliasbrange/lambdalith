@@ -11,7 +11,7 @@ describe('DynamoDB Streams routing', () => {
 		const router = new EventRouter()
 		const handler = mock(() => {})
 
-		router.dynamodb({ tableName: 'orders-table' }, handler)
+		router.dynamodb('orders-table', handler)
 
 		const event = createDynamoDBEvent(
 			'orders-table',
@@ -42,7 +42,7 @@ describe('DynamoDB Streams routing', () => {
 		const router = new EventRouter()
 		const events: string[] = []
 
-		router.dynamodb({ tableName: 'orders-table' }, (c) => {
+		router.dynamodb('orders-table', (c) => {
 			events.push(c.dynamodb.eventName)
 		})
 
@@ -67,7 +67,7 @@ describe('DynamoDB Streams routing', () => {
 		const router = new EventRouter()
 		let capturedKeys: unknown
 
-		router.dynamodb({ tableName: 'orders-table' }, (c) => {
+		router.dynamodb('orders-table', (c) => {
 			capturedKeys = c.dynamodb.keys
 		})
 
@@ -88,13 +88,14 @@ describe('DynamoDB Streams routing', () => {
 		const order: string[] = []
 
 		router.dynamodb(
-			{ tableName: 'orders-table', sequential: true },
+			'orders-table',
 			async (c) => {
 				const id = c.dynamodb.eventId
 				order.push(`start-${id}`)
 				await new Promise((r) => setTimeout(r, id === 'evt-1' ? 20 : 5))
 				order.push(`end-${id}`)
 			},
+			{ sequential: true },
 		)
 
 		const event = createDynamoDBBatchEvent('orders-table', 'INSERT', [
@@ -118,13 +119,17 @@ describe('DynamoDB Streams routing', () => {
 		const router = new EventRouter()
 		const processed: string[] = []
 
-		router.dynamodb({ tableName: 'orders-table', sequential: true }, (c) => {
-			const id = c.dynamodb.eventId
-			if (id === 'evt-2') {
-				throw new Error('Intentional failure')
-			}
-			processed.push(id)
-		})
+		router.dynamodb(
+			'orders-table',
+			(c) => {
+				const id = c.dynamodb.eventId
+				if (id === 'evt-2') {
+					throw new Error('Intentional failure')
+				}
+				processed.push(id)
+			},
+			{ sequential: true },
+		)
 
 		const event = createDynamoDBBatchEvent('orders-table', 'INSERT', [
 			{ eventId: 'evt-1', keys: { pk: { S: '1' } } },

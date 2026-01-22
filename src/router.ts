@@ -8,15 +8,14 @@ import {
 } from './routers/index.ts'
 import type {
 	DynamoDBHandler,
-	DynamoDBMatchOptions,
+	DynamoDBOptions,
 	ErrorHandler,
 	EventBridgeHandler,
 	EventBridgeMatchOptions,
 	NotFoundHandler,
 	SNSHandler,
-	SNSMatchOptions,
 	SQSHandler,
-	SQSMatchOptions,
+	SQSOptions,
 } from './types.ts'
 
 export class EventRouter {
@@ -36,21 +35,40 @@ export class EventRouter {
 	 * router.sqs(handler)
 	 *
 	 * // Specific queue
-	 * router.sqs({ queueName: 'orders-queue' }, handler)
+	 * router.sqs('orders-queue', handler)
 	 *
 	 * // Sequential processing
-	 * router.sqs({ queueName: 'orders-queue', sequential: true }, handler)
+	 * router.sqs('orders-queue', handler, { sequential: true })
 	 */
 	sqs(handler: SQSHandler): this
-	sqs(options: SQSMatchOptions, handler: SQSHandler): this
+	sqs(handler: SQSHandler, options: SQSOptions): this
+	sqs(queueName: string, handler: SQSHandler): this
+	sqs(queueName: string, handler: SQSHandler, options: SQSOptions): this
 	sqs(
-		optionsOrHandler: SQSMatchOptions | SQSHandler,
-		handler?: SQSHandler,
+		queueNameOrHandler: string | SQSHandler,
+		handlerOrOptions?: SQSHandler | SQSOptions,
+		options?: SQSOptions,
 	): this {
-		if (typeof optionsOrHandler === 'function') {
-			this.sqsRouter.add(optionsOrHandler)
-		} else if (handler) {
-			this.sqsRouter.add(optionsOrHandler, handler)
+		if (typeof queueNameOrHandler === 'function') {
+			// sqs(handler) or sqs(handler, options)
+			const opts =
+				typeof handlerOrOptions === 'object' ? handlerOrOptions : undefined
+			if (opts) {
+				this.sqsRouter.add(queueNameOrHandler, opts)
+			} else {
+				this.sqsRouter.add(queueNameOrHandler)
+			}
+		} else {
+			// sqs(queueName, handler) or sqs(queueName, handler, options)
+			if (options) {
+				this.sqsRouter.add(
+					queueNameOrHandler,
+					handlerOrOptions as SQSHandler,
+					options,
+				)
+			} else {
+				this.sqsRouter.add(queueNameOrHandler, handlerOrOptions as SQSHandler)
+			}
 		}
 		return this
 	}
@@ -64,21 +82,15 @@ export class EventRouter {
 	 * router.sns(handler)
 	 *
 	 * // Specific topic
-	 * router.sns({ topicName: 'orders-topic' }, handler)
-	 *
-	 * // Sequential processing
-	 * router.sns({ topicName: 'orders-topic', sequential: true }, handler)
+	 * router.sns('orders-topic', handler)
 	 */
 	sns(handler: SNSHandler): this
-	sns(options: SNSMatchOptions, handler: SNSHandler): this
-	sns(
-		optionsOrHandler: SNSMatchOptions | SNSHandler,
-		handler?: SNSHandler,
-	): this {
-		if (typeof optionsOrHandler === 'function') {
-			this.snsRouter.add(optionsOrHandler)
+	sns(topicName: string, handler: SNSHandler): this
+	sns(topicNameOrHandler: string | SNSHandler, handler?: SNSHandler): this {
+		if (typeof topicNameOrHandler === 'function') {
+			this.snsRouter.add(topicNameOrHandler)
 		} else if (handler) {
-			this.snsRouter.add(optionsOrHandler, handler)
+			this.snsRouter.add(topicNameOrHandler, handler)
 		}
 		return this
 	}
@@ -120,21 +132,47 @@ export class EventRouter {
 	 * router.dynamodb(handler)
 	 *
 	 * // Specific table
-	 * router.dynamodb({ tableName: 'orders' }, handler)
+	 * router.dynamodb('orders', handler)
 	 *
 	 * // Sequential processing
-	 * router.dynamodb({ tableName: 'orders', sequential: true }, handler)
+	 * router.dynamodb('orders', handler, { sequential: true })
 	 */
 	dynamodb(handler: DynamoDBHandler): this
-	dynamodb(options: DynamoDBMatchOptions, handler: DynamoDBHandler): this
+	dynamodb(handler: DynamoDBHandler, options: DynamoDBOptions): this
+	dynamodb(tableName: string, handler: DynamoDBHandler): this
 	dynamodb(
-		optionsOrHandler: DynamoDBMatchOptions | DynamoDBHandler,
-		handler?: DynamoDBHandler,
+		tableName: string,
+		handler: DynamoDBHandler,
+		options: DynamoDBOptions,
+	): this
+	dynamodb(
+		tableNameOrHandler: string | DynamoDBHandler,
+		handlerOrOptions?: DynamoDBHandler | DynamoDBOptions,
+		options?: DynamoDBOptions,
 	): this {
-		if (typeof optionsOrHandler === 'function') {
-			this.dynamodbRouter.add(optionsOrHandler)
-		} else if (handler) {
-			this.dynamodbRouter.add(optionsOrHandler, handler)
+		if (typeof tableNameOrHandler === 'function') {
+			// dynamodb(handler) or dynamodb(handler, options)
+			const opts =
+				typeof handlerOrOptions === 'object' ? handlerOrOptions : undefined
+			if (opts) {
+				this.dynamodbRouter.add(tableNameOrHandler, opts)
+			} else {
+				this.dynamodbRouter.add(tableNameOrHandler)
+			}
+		} else {
+			// dynamodb(tableName, handler) or dynamodb(tableName, handler, options)
+			if (options) {
+				this.dynamodbRouter.add(
+					tableNameOrHandler,
+					handlerOrOptions as DynamoDBHandler,
+					options,
+				)
+			} else {
+				this.dynamodbRouter.add(
+					tableNameOrHandler,
+					handlerOrOptions as DynamoDBHandler,
+				)
+			}
 		}
 		return this
 	}

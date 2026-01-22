@@ -114,13 +114,7 @@ export type ErrorHandler = (
 ) => void | Promise<void>
 
 // Match option types
-export interface SQSMatchOptions {
-	queueName?: string
-	sequential?: boolean
-}
-
-export interface SNSMatchOptions {
-	topicName?: string
+export interface SQSOptions {
 	sequential?: boolean
 }
 
@@ -129,8 +123,7 @@ export interface EventBridgeMatchOptions {
 	detailType?: string
 }
 
-export interface DynamoDBMatchOptions {
-	tableName?: string
+export interface DynamoDBOptions {
 	sequential?: boolean
 }
 

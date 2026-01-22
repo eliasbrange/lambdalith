@@ -4,28 +4,24 @@ import {
 	createNotFoundContext,
 	createSNSContext,
 } from '../contexts.ts'
-import type {
-	ErrorHandler,
-	NotFoundHandler,
-	Route,
-	SNSHandler,
-	SNSMatchOptions,
-} from '../types.ts'
+import type { ErrorHandler, NotFoundHandler, SNSHandler } from '../types.ts'
 import { parseTopicName } from '../utils.ts'
 
+interface SNSRoute {
+	topicName: string | undefined
+	handler: SNSHandler
+}
+
 export class SnsRouter {
-	private routes: Route<SNSHandler, SNSMatchOptions | undefined>[] = []
+	private routes: SNSRoute[] = []
 
 	add(handler: SNSHandler): void
-	add(options: SNSMatchOptions, handler: SNSHandler): void
-	add(
-		optionsOrHandler: SNSMatchOptions | SNSHandler,
-		handler?: SNSHandler,
-	): void {
-		if (typeof optionsOrHandler === 'function') {
-			this.routes.push({ options: undefined, handler: optionsOrHandler })
+	add(topicName: string, handler: SNSHandler): void
+	add(topicNameOrHandler: string | SNSHandler, handler?: SNSHandler): void {
+		if (typeof topicNameOrHandler === 'function') {
+			this.routes.push({ topicName: undefined, handler: topicNameOrHandler })
 		} else if (handler) {
-			this.routes.push({ options: optionsOrHandler, handler })
+			this.routes.push({ topicName: topicNameOrHandler, handler })
 		}
 	}
 
@@ -35,57 +31,8 @@ export class SnsRouter {
 		errorHandler?: ErrorHandler,
 		notFoundHandler?: NotFoundHandler,
 	): Promise<void> {
-		const firstRecord = event.Records[0]
-		const isSequential = this.isSequential(firstRecord)
-
-		if (isSequential) {
-			await this.processSequentially(
-				event.Records,
-				lambdaContext,
-				errorHandler,
-				notFoundHandler,
-			)
-		} else {
-			await this.processInParallel(
-				event.Records,
-				lambdaContext,
-				errorHandler,
-				notFoundHandler,
-			)
-		}
-	}
-
-	private isSequential(firstRecord: SNSEventRecord | undefined): boolean {
-		if (!firstRecord) return false
-		const topic = parseTopicName(firstRecord.Sns.TopicArn)
-		const route = this.matchRoute(topic)
-		return route?.options?.sequential === true
-	}
-
-	private async processSequentially(
-		records: SNSEventRecord[],
-		lambdaContext: LambdaContext,
-		errorHandler?: ErrorHandler,
-		notFoundHandler?: NotFoundHandler,
-	): Promise<void> {
-		for (const record of records) {
-			await this.processRecord(
-				record,
-				lambdaContext,
-				errorHandler,
-				notFoundHandler,
-			)
-		}
-	}
-
-	private async processInParallel(
-		records: SNSEventRecord[],
-		lambdaContext: LambdaContext,
-		errorHandler?: ErrorHandler,
-		notFoundHandler?: NotFoundHandler,
-	): Promise<void> {
 		await Promise.allSettled(
-			records.map((record) =>
+			event.Records.map((record) =>
 				this.processRecord(
 					record,
 					lambdaContext,
@@ -125,15 +72,9 @@ export class SnsRouter {
 		}
 	}
 
-	private matchRoute(
-		topic: string,
-	): Route<SNSHandler, SNSMatchOptions | undefined> | undefined {
+	private matchRoute(topic: string): SNSRoute | undefined {
 		for (const route of this.routes) {
-			if (
-				!route.options ||
-				!route.options.topicName ||
-				route.options.topicName === topic
-			) {
+			if (!route.topicName || route.topicName === topic) {
 				return route
 			}
 		}

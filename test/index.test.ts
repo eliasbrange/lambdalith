@@ -20,7 +20,7 @@ describe('EventRouter', () => {
 			const router = new EventRouter()
 			const errorHandler = mock(() => {})
 
-			router.sqs({ queueName: 'orders-queue' }, () => {
+			router.sqs('orders-queue', () => {
 				throw new Error('Handler error')
 			})
 			router.onError(errorHandler)
@@ -35,7 +35,7 @@ describe('EventRouter', () => {
 			const router = new EventRouter()
 			let capturedError: Error | undefined
 
-			router.sqs({ queueName: 'orders-queue' }, () => {
+			router.sqs('orders-queue', () => {
 				throw new Error('Test error message')
 			})
 			router.onError((err) => {

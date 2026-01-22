@@ -12,25 +12,45 @@ import {
 import type {
 	ErrorHandler,
 	NotFoundHandler,
-	Route,
 	SQSHandler,
-	SQSMatchOptions,
+	SQSOptions,
 } from '../types.ts'
 import { parseQueueName } from '../utils.ts'
 
+interface SQSRoute {
+	queueName: string | undefined
+	options: SQSOptions | undefined
+	handler: SQSHandler
+}
+
 export class SqsRouter {
-	private routes: Route<SQSHandler, SQSMatchOptions | undefined>[] = []
+	private routes: SQSRoute[] = []
 
 	add(handler: SQSHandler): void
-	add(options: SQSMatchOptions, handler: SQSHandler): void
+	add(handler: SQSHandler, options: SQSOptions): void
+	add(queueName: string, handler: SQSHandler): void
+	add(queueName: string, handler: SQSHandler, options: SQSOptions): void
 	add(
-		optionsOrHandler: SQSMatchOptions | SQSHandler,
-		handler?: SQSHandler,
+		queueNameOrHandler: string | SQSHandler,
+		handlerOrOptions?: SQSHandler | SQSOptions,
+		options?: SQSOptions,
 	): void {
-		if (typeof optionsOrHandler === 'function') {
-			this.routes.push({ options: undefined, handler: optionsOrHandler })
-		} else if (handler) {
-			this.routes.push({ options: optionsOrHandler, handler })
+		if (typeof queueNameOrHandler === 'function') {
+			// add(handler) or add(handler, options)
+			const opts =
+				typeof handlerOrOptions === 'object' ? handlerOrOptions : undefined
+			this.routes.push({
+				queueName: undefined,
+				options: opts,
+				handler: queueNameOrHandler,
+			})
+		} else {
+			// add(queueName, handler) or add(queueName, handler, options)
+			this.routes.push({
+				queueName: queueNameOrHandler,
+				options,
+				handler: handlerOrOptions as SQSHandler,
+			})
 		}
 	}
 
@@ -150,15 +170,9 @@ export class SqsRouter {
 		}
 	}
 
-	private matchRoute(
-		queue: string,
-	): Route<SQSHandler, SQSMatchOptions | undefined> | undefined {
+	private matchRoute(queue: string): SQSRoute | undefined {
 		for (const route of this.routes) {
-			if (
-				!route.options ||
-				!route.options.queueName ||
-				route.options.queueName === queue
-			) {
+			if (!route.queueName || route.queueName === queue) {
 				return route
 			}
 		}

@@ -11,7 +11,7 @@ describe('SQS routing', () => {
 		const router = new EventRouter()
 		const handler = mock(() => {})
 
-		router.sqs({ queueName: 'orders-queue' }, handler)
+		router.sqs('orders-queue', handler)
 
 		const event = createSQSEvent('orders-queue', 'msg-1', { orderId: '123' })
 		await router.handler()(event, mockLambdaContext)
@@ -36,7 +36,7 @@ describe('SQS routing', () => {
 		const specificHandler = mock(() => {})
 		const catchAllHandler = mock(() => {})
 
-		router.sqs({ queueName: 'orders-queue' }, specificHandler)
+		router.sqs('orders-queue', specificHandler)
 		router.sqs(catchAllHandler)
 
 		const event = createSQSEvent('orders-queue', 'msg-1', { orderId: '123' })
@@ -52,7 +52,7 @@ describe('SQS routing', () => {
 		const catchAllHandler = mock(() => {})
 
 		router.sqs(catchAllHandler)
-		router.sqs({ queueName: 'orders-queue' }, specificHandler)
+		router.sqs('orders-queue', specificHandler)
 
 		const event = createSQSEvent('orders-queue', 'msg-1', { orderId: '123' })
 		await router.handler()(event, mockLambdaContext)
@@ -65,7 +65,7 @@ describe('SQS routing', () => {
 		const router = new EventRouter()
 		let capturedContext: unknown
 
-		router.sqs({ queueName: 'orders-queue' }, (c) => {
+		router.sqs('orders-queue', (c) => {
 			capturedContext = {
 				queue: c.sqs.queue,
 				body: c.sqs.body,
@@ -92,7 +92,7 @@ describe('SQS routing', () => {
 	test('returns batch item failures for failed records', async () => {
 		const router = new EventRouter()
 
-		router.sqs({ queueName: 'orders-queue' }, () => {
+		router.sqs('orders-queue', () => {
 			throw new Error('Processing failed')
 		})
 
@@ -108,7 +108,7 @@ describe('SQS routing', () => {
 		const router = new EventRouter()
 		let getValue: unknown
 
-		router.sqs({ queueName: 'orders-queue' }, (c) => {
+		router.sqs('orders-queue', (c) => {
 			c.set('traceId', 'trace-123')
 			getValue = c.get('traceId')
 		})
@@ -123,13 +123,17 @@ describe('SQS routing', () => {
 		const router = new EventRouter()
 		const order: string[] = []
 
-		router.sqs({ queueName: 'fifo-queue', sequential: true }, async (c) => {
-			const id = c.sqs.messageId
-			order.push(`start-${id}`)
-			// Simulate async work with varying delays
-			await new Promise((r) => setTimeout(r, id === 'msg-1' ? 20 : 5))
-			order.push(`end-${id}`)
-		})
+		router.sqs(
+			'fifo-queue',
+			async (c) => {
+				const id = c.sqs.messageId
+				order.push(`start-${id}`)
+				// Simulate async work with varying delays
+				await new Promise((r) => setTimeout(r, id === 'msg-1' ? 20 : 5))
+				order.push(`end-${id}`)
+			},
+			{ sequential: true },
+		)
 
 		const event = createSQSBatchEvent('fifo-queue', [
 			{ messageId: 'msg-1', body: { n: 1 } },
@@ -153,7 +157,7 @@ describe('SQS routing', () => {
 		const router = new EventRouter()
 		const order: string[] = []
 
-		router.sqs({ queueName: 'standard-queue' }, async (c) => {
+		router.sqs('standard-queue', async (c) => {
 			const id = c.sqs.messageId
 			order.push(`start-${id}`)
 			// Simulate async work with varying delays
@@ -183,12 +187,15 @@ describe('SQS routing', () => {
 		const router = new EventRouter()
 		const order: string[] = []
 
-		router.sqs({ sequential: true }, async (c) => {
-			const id = c.sqs.messageId
-			order.push(`start-${id}`)
-			await new Promise((r) => setTimeout(r, id === 'msg-1' ? 15 : 5))
-			order.push(`end-${id}`)
-		})
+		router.sqs(
+			async (c) => {
+				const id = c.sqs.messageId
+				order.push(`start-${id}`)
+				await new Promise((r) => setTimeout(r, id === 'msg-1' ? 15 : 5))
+				order.push(`end-${id}`)
+			},
+			{ sequential: true },
+		)
 
 		const event = createSQSBatchEvent('any-queue', [
 			{ messageId: 'msg-1', body: {} },
@@ -208,13 +215,17 @@ describe('SQS routing', () => {
 		const router = new EventRouter()
 		const processed: string[] = []
 
-		router.sqs({ queueName: 'fifo-queue', sequential: true }, (c) => {
-			const id = c.sqs.messageId
-			if (id === 'msg-2') {
-				throw new Error('Intentional failure')
-			}
-			processed.push(id)
-		})
+		router.sqs(
+			'fifo-queue',
+			(c) => {
+				const id = c.sqs.messageId
+				if (id === 'msg-2') {
+					throw new Error('Intentional failure')
+				}
+				processed.push(id)
+			},
+			{ sequential: true },
+		)
 
 		const event = createSQSBatchEvent('fifo-queue', [
 			{ messageId: 'msg-1', body: {} },

@@ -25,19 +25,19 @@ import { EventRouter } from 'lambda-router-poc';
 
 const router = new EventRouter();
 
-router.sqs({ queueName: 'orders-queue' }, (c) => {
+router.sqs('MyQueue', (c) => {
   console.log(c.sqs.body);
 });
 
-router.sns({ topicName: 'user-events' }, (c) => {
+router.sns('MyTopic', (c) => {
   console.log(c.sns.body);
 });
 
-router.event({ source: 'myapp.orders', detailType: 'OrderCreated' }, (c) => {
+router.event({ source: 'MyService', detailType: 'MyEvent' }, (c) => {
   console.log(c.event.detail);
 });
 
-router.dynamodb.insert({ tableName: 'orders' }, (c) => {
+router.dynamodb('MyTable', (c) => {
   console.log(c.dynamodb.newImage);
 });
 
@@ -58,7 +58,7 @@ export const handler = router.handler();
 Routes are matched in registration order – the first matching route wins. Register specific routes before catch-alls:
 
 ```typescript
-router.sqs({ queueName: 'specific-queue' }, (c) => {
+router.sqs('SpecificQueue', (c) => {
   // will match the specific queue
 });
 router.sqs((c) => {
@@ -75,9 +75,9 @@ For SQS and DynamoDB Streams, the router automatically handles partial batch fai
 **Sequential:** Records processed one at a time. Stops processing on failure and marks remaining records as failed.
 
 ```typescript
-router.sqs({ queueName: "my-queue", sequential: true }, (c) => {
+router.sqs('MyQueue.fifo', (c) => {
   // will process messages from my-queue sequentially
-});
+}, { sequential: true });
 ```
 
 ## Context
