@@ -38,8 +38,8 @@ describe('SNS routing', () => {
 		})
 		router.onError(errorHandler)
 
-		const event = createSNSEvent('any.queue', 'msg-1', { data: 'test' })
-		await expect(router.handler()(event, mockLambdaContext)).rejects.toThrow(
+		const event = createSNSEvent('notifications', 'msg-1', { alert: 'test' })
+		expect(router.handler()(event, mockLambdaContext)).rejects.toThrow(
 			'Test error',
 		)
 
@@ -52,7 +52,7 @@ describe('SNS routing', () => {
 
 		router.notFound(notFoundHandler)
 
-		const event = createSNSEvent('any.queue', 'msg-1', { data: 'test' })
+		const event = createSNSEvent('notifications', 'msg-1', { alert: 'test' })
 		await router.handler()(event, mockLambdaContext)
 
 		expect(notFoundHandler).toHaveBeenCalledTimes(1)

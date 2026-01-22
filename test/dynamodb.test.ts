@@ -162,11 +162,12 @@ describe('DynamoDB Streams routing', () => {
 		router.onError(errorHandler)
 
 		const event = createDynamoDBEvent('any-table', 'INSERT', {})
-		await expect(router.handler()(event, mockLambdaContext)).rejects.toThrow(
-			'Test error',
-		)
+		const result = await router.handler()(event, mockLambdaContext)
 
 		expect(errorHandler).toHaveBeenCalledTimes(1)
+		expect(result).toEqual({
+			batchItemFailures: [{ itemIdentifier: 'test-event-id' }],
+		})
 	})
 
 	test('routes to not found handler when no handler is found', async () => {

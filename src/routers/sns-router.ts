@@ -1,4 +1,4 @@
-import type { LambdaContext, SNSEvent, SNSEventRecord } from '../aws-types.ts'
+import type { LambdaContext, SNSEvent } from '../aws-types.ts'
 import {
 	createErrorContext,
 	createNotFoundContext,
@@ -31,24 +31,10 @@ export class SnsRouter {
 		errorHandler?: ErrorHandler,
 		notFoundHandler?: NotFoundHandler,
 	): Promise<void> {
-		await Promise.allSettled(
-			event.Records.map((record) =>
-				this.processRecord(
-					record,
-					lambdaContext,
-					errorHandler,
-					notFoundHandler,
-				),
-			),
-		)
-	}
+		// SNS notifications always contain exactly one message
+		const record = event.Records[0]
+		if (!record) return
 
-	private async processRecord(
-		record: SNSEventRecord,
-		lambdaContext: LambdaContext,
-		errorHandler?: ErrorHandler,
-		notFoundHandler?: NotFoundHandler,
-	): Promise<void> {
 		const topic = parseTopicName(record.Sns.TopicArn)
 		const route = this.matchRoute(topic)
 

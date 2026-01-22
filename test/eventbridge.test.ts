@@ -100,7 +100,7 @@ describe('EventBridge routing', () => {
 		router.onError(errorHandler)
 
 		const event = createEventBridgeEvent('any.source', 'AnyType', {})
-		await expect(router.handler()(event, mockLambdaContext)).rejects.toThrow(
+		expect(router.handler()(event, mockLambdaContext)).rejects.toThrow(
 			'Test error',
 		)
 

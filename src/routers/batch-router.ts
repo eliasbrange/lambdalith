@@ -27,7 +27,7 @@ export abstract class BatchRouter<
 		const firstRecord = records[0]
 		const isSequential = this.isSequential(firstRecord)
 
-		const failures = isSequential
+		const { failures } = isSequential
 			? await this.processSequentially(
 					records,
 					lambdaContext,
@@ -57,7 +57,7 @@ export abstract class BatchRouter<
 		lambdaContext: LambdaContext,
 		errorHandler?: ErrorHandler,
 		notFoundHandler?: NotFoundHandler,
-	): Promise<string[]> {
+	): Promise<{ failures: string[]; firstError?: unknown }> {
 		for (let i = 0; i < records.length; i++) {
 			const record = records[i]
 			if (!record) continue
@@ -68,11 +68,14 @@ export abstract class BatchRouter<
 					errorHandler,
 					notFoundHandler,
 				)
-			} catch {
-				return records.slice(i).map((r) => this.getRecordId(r))
+			} catch (error) {
+				return {
+					failures: records.slice(i).map((r) => this.getRecordId(r)),
+					firstError: error,
+				}
 			}
 		}
-		return []
+		return { failures: [] }
 	}
 
 	private async processInParallel(
@@ -80,7 +83,7 @@ export abstract class BatchRouter<
 		lambdaContext: LambdaContext,
 		errorHandler?: ErrorHandler,
 		notFoundHandler?: NotFoundHandler,
-	): Promise<string[]> {
+	): Promise<{ failures: string[]; firstError?: unknown }> {
 		const results = await Promise.allSettled(
 			records.map((record) =>
 				this.processRecord(
@@ -93,15 +96,20 @@ export abstract class BatchRouter<
 		)
 
 		const failures: string[] = []
+		let firstError: unknown
 		for (let i = 0; i < results.length; i++) {
-			if (results[i]?.status === 'rejected') {
+			const result = results[i]
+			if (result?.status === 'rejected') {
+				if (firstError === undefined) {
+					firstError = result.reason
+				}
 				const record = records[i]
 				if (record) {
 					failures.push(this.getRecordId(record))
 				}
 			}
 		}
-		return failures
+		return { failures, firstError }
 	}
 
 	/**
