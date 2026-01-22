@@ -2,13 +2,20 @@ import type { BatchResponse, LambdaContext } from '../aws-types.ts'
 import { detectEventType } from '../detection.ts'
 import type {
 	DynamoDBHandler,
+	DynamoDBMiddleware,
 	DynamoDBOptions,
 	ErrorHandler,
 	EventBridgeHandler,
 	EventBridgeMatchOptions,
+	EventBridgeMiddleware,
+	EventSource,
+	Middleware,
+	MiddlewareEntry,
 	NotFoundHandler,
 	SNSHandler,
+	SNSMiddleware,
 	SQSHandler,
+	SQSMiddleware,
 	SQSOptions,
 } from '../types.ts'
 import { DynamoDBRouter } from './dynamodb-router.ts'
@@ -23,6 +30,7 @@ export class EventRouter {
 	private dynamodbRouter = new DynamoDBRouter()
 	private notFoundHandler?: NotFoundHandler
 	private errorHandler?: ErrorHandler
+	private middlewareEntries: MiddlewareEntry[] = []
 
 	/**
 	 * Register an SQS handler.
@@ -155,6 +163,64 @@ export class EventRouter {
 	}
 
 	/**
+	 * Register middleware that runs for each record.
+	 * Middleware executes in onion order (first registered wraps last registered).
+	 *
+	 * @example
+	 * // Global middleware (all event types)
+	 * router.use(async (c, next) => {
+	 *   console.log('before')
+	 *   await next()
+	 *   console.log('after')
+	 * })
+	 *
+	 * // Filter by event type
+	 * router.use('sqs', sqsMiddleware)
+	 */
+	use(handler: Middleware): this
+	use(filter: 'sqs', handler: SQSMiddleware): this
+	use(filter: 'sns', handler: SNSMiddleware): this
+	use(filter: 'event', handler: EventBridgeMiddleware): this
+	use(filter: 'dynamodb', handler: DynamoDBMiddleware): this
+	use(
+		filterOrHandler:
+			| EventSource
+			| Middleware
+			| SQSMiddleware
+			| SNSMiddleware
+			| EventBridgeMiddleware
+			| DynamoDBMiddleware,
+		handler?:
+			| Middleware
+			| SQSMiddleware
+			| SNSMiddleware
+			| EventBridgeMiddleware
+			| DynamoDBMiddleware,
+	): this {
+		if (typeof filterOrHandler === 'function') {
+			this.middlewareEntries.push({
+				filter: undefined,
+				handler: filterOrHandler as Middleware,
+			})
+		} else if (handler) {
+			this.middlewareEntries.push({
+				filter: filterOrHandler,
+				handler: handler as Middleware,
+			})
+		}
+		return this
+	}
+
+	/**
+	 * Get middleware filtered for a specific event type.
+	 */
+	private getMiddlewareFor(type: EventSource): Middleware[] {
+		return this.middlewareEntries
+			.filter((entry) => !entry.filter || entry.filter === type)
+			.map((entry) => entry.handler)
+	}
+
+	/**
 	 * Create a Lambda handler function.
 	 */
 	handler(): (
@@ -174,6 +240,7 @@ export class EventRouter {
 						context,
 						this.errorHandler,
 						this.notFoundHandler,
+						this.getMiddlewareFor('sqs'),
 					)
 				case 'sns':
 					await this.snsRouter.handle(
@@ -181,6 +248,7 @@ export class EventRouter {
 						context,
 						this.errorHandler,
 						this.notFoundHandler,
+						this.getMiddlewareFor('sns'),
 					)
 					return undefined
 				case 'event':
@@ -189,6 +257,7 @@ export class EventRouter {
 						context,
 						this.errorHandler,
 						this.notFoundHandler,
+						this.getMiddlewareFor('event'),
 					)
 					return undefined
 				case 'dynamodb':
@@ -197,6 +266,7 @@ export class EventRouter {
 						context,
 						this.errorHandler,
 						this.notFoundHandler,
+						this.getMiddlewareFor('dynamodb'),
 					)
 				case 'unknown':
 					throw new Error(

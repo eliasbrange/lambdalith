@@ -11,13 +11,16 @@ import {
 } from '../contexts.ts'
 import type {
 	ErrorHandler,
+	Middleware,
 	NotFoundHandler,
+	SQSContext,
 	SQSHandler,
 	SQSOptions,
 	SQSRoute,
 } from '../types.ts'
 import { parseQueueName } from '../utils.ts'
 import { BatchRouter } from './batch-router.ts'
+import { composeMiddleware } from './middleware.ts'
 
 export class SqsRouter extends BatchRouter<SQSRecord, SQSRoute> {
 	add(handler: SQSHandler): void
@@ -53,12 +56,14 @@ export class SqsRouter extends BatchRouter<SQSRecord, SQSRoute> {
 		lambdaContext: LambdaContext,
 		errorHandler?: ErrorHandler,
 		notFoundHandler?: NotFoundHandler,
+		middleware: Middleware<SQSContext>[] = [],
 	): Promise<BatchResponse> {
 		return this.handle(
 			event.Records,
 			lambdaContext,
 			errorHandler,
 			notFoundHandler,
+			middleware as Middleware[],
 		)
 	}
 
@@ -76,6 +81,7 @@ export class SqsRouter extends BatchRouter<SQSRecord, SQSRoute> {
 		lambdaContext: LambdaContext,
 		errorHandler?: ErrorHandler,
 		notFoundHandler?: NotFoundHandler,
+		middleware: Middleware[] = [],
 	): Promise<void> {
 		const queue = parseQueueName(record.eventSourceARN)
 		const route = this.matchRoute(queue)
@@ -90,7 +96,11 @@ export class SqsRouter extends BatchRouter<SQSRecord, SQSRoute> {
 
 		try {
 			const ctx = createSQSContext(record, lambdaContext)
-			await route.handler(ctx)
+			const composed = composeMiddleware(
+				middleware as Middleware<SQSContext>[],
+				route.handler,
+			)
+			await composed(ctx)
 		} catch (error) {
 			if (errorHandler) {
 				const ctx = createErrorContext('sqs', record, lambdaContext)

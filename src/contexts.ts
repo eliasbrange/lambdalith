@@ -184,6 +184,7 @@ export function createSQSContext(
 ): SQSContext {
 	const base = new BaseContextImpl(lambdaContext)
 	return Object.assign(base, {
+		source: 'sqs' as const,
 		sqs: new SQSDataImpl(record),
 	}) as SQSContext
 }
@@ -194,6 +195,7 @@ export function createSNSContext(
 ): SNSContext {
 	const base = new BaseContextImpl(lambdaContext)
 	return Object.assign(base, {
+		source: 'sns' as const,
 		sns: new SNSDataImpl(record),
 	}) as SNSContext
 }
@@ -204,6 +206,7 @@ export function createEventBridgeContext(
 ): EventBridgeContext {
 	const base = new BaseContextImpl(lambdaContext)
 	return Object.assign(base, {
+		source: 'event' as const,
 		event: new EventBridgeDataImpl(event),
 	}) as EventBridgeContext
 }
@@ -214,6 +217,7 @@ export function createDynamoDBContext(
 ): DynamoDBContext {
 	const base = new BaseContextImpl(lambdaContext)
 	return Object.assign(base, {
+		source: 'dynamodb' as const,
 		dynamodb: new DynamoDBDataImpl(record),
 	}) as DynamoDBContext
 }

@@ -6,11 +6,14 @@ import {
 } from '../contexts.ts'
 import type {
 	ErrorHandler,
+	EventBridgeContext,
 	EventBridgeHandler,
 	EventBridgeMatchOptions,
 	EventBridgeRoute,
+	Middleware,
 	NotFoundHandler,
 } from '../types.ts'
+import { composeMiddleware } from './middleware.ts'
 
 export class EventBridgeRouter {
 	private routes: EventBridgeRoute[] = []
@@ -33,6 +36,7 @@ export class EventBridgeRouter {
 		lambdaContext: LambdaContext,
 		errorHandler?: ErrorHandler,
 		notFoundHandler?: NotFoundHandler,
+		middleware: Middleware<EventBridgeContext>[] = [],
 	): Promise<void> {
 		const source = event.source
 		const detailType = event['detail-type']
@@ -48,7 +52,8 @@ export class EventBridgeRouter {
 
 		try {
 			const ctx = createEventBridgeContext(event, lambdaContext)
-			await handler(ctx)
+			const composed = composeMiddleware(middleware, handler)
+			await composed(ctx)
 		} catch (error) {
 			if (errorHandler) {
 				const ctx = createErrorContext('event', event, lambdaContext)

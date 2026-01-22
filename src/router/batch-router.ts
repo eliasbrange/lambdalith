@@ -1,5 +1,5 @@
 import type { BatchResponse, LambdaContext } from '../aws-types.ts'
-import type { ErrorHandler, NotFoundHandler } from '../types.ts'
+import type { ErrorHandler, Middleware, NotFoundHandler } from '../types.ts'
 
 /**
  * Base interface for routes that support sequential processing options.
@@ -23,6 +23,7 @@ export abstract class BatchRouter<
 		lambdaContext: LambdaContext,
 		errorHandler?: ErrorHandler,
 		notFoundHandler?: NotFoundHandler,
+		middleware: Middleware[] = [],
 	): Promise<BatchResponse> {
 		const firstRecord = records[0]
 		const isSequential = this.isSequential(firstRecord)
@@ -33,12 +34,14 @@ export abstract class BatchRouter<
 					lambdaContext,
 					errorHandler,
 					notFoundHandler,
+					middleware,
 				)
 			: await this.processInParallel(
 					records,
 					lambdaContext,
 					errorHandler,
 					notFoundHandler,
+					middleware,
 				)
 
 		return {
@@ -57,6 +60,7 @@ export abstract class BatchRouter<
 		lambdaContext: LambdaContext,
 		errorHandler?: ErrorHandler,
 		notFoundHandler?: NotFoundHandler,
+		middleware: Middleware[] = [],
 	): Promise<{ failures: string[]; firstError?: unknown }> {
 		for (let i = 0; i < records.length; i++) {
 			const record = records[i]
@@ -67,6 +71,7 @@ export abstract class BatchRouter<
 					lambdaContext,
 					errorHandler,
 					notFoundHandler,
+					middleware,
 				)
 			} catch (error) {
 				return {
@@ -83,6 +88,7 @@ export abstract class BatchRouter<
 		lambdaContext: LambdaContext,
 		errorHandler?: ErrorHandler,
 		notFoundHandler?: NotFoundHandler,
+		middleware: Middleware[] = [],
 	): Promise<{ failures: string[]; firstError?: unknown }> {
 		const results = await Promise.allSettled(
 			records.map((record) =>
@@ -91,6 +97,7 @@ export abstract class BatchRouter<
 					lambdaContext,
 					errorHandler,
 					notFoundHandler,
+					middleware,
 				),
 			),
 		)
@@ -130,5 +137,6 @@ export abstract class BatchRouter<
 		lambdaContext: LambdaContext,
 		errorHandler?: ErrorHandler,
 		notFoundHandler?: NotFoundHandler,
+		middleware?: Middleware[],
 	): Promise<void>
 }

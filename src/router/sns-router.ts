@@ -6,11 +6,14 @@ import {
 } from '../contexts.ts'
 import type {
 	ErrorHandler,
+	Middleware,
 	NotFoundHandler,
+	SNSContext,
 	SNSHandler,
 	SNSRoute,
 } from '../types.ts'
 import { parseTopicName } from '../utils.ts'
+import { composeMiddleware } from './middleware.ts'
 
 export class SnsRouter {
 	private routes: SNSRoute[] = []
@@ -30,6 +33,7 @@ export class SnsRouter {
 		lambdaContext: LambdaContext,
 		errorHandler?: ErrorHandler,
 		notFoundHandler?: NotFoundHandler,
+		middleware: Middleware<SNSContext>[] = [],
 	): Promise<void> {
 		// SNS notifications always contain exactly one message
 		const record = event.Records[0]
@@ -48,7 +52,8 @@ export class SnsRouter {
 
 		try {
 			const ctx = createSNSContext(record, lambdaContext)
-			await route.handler(ctx)
+			const composed = composeMiddleware(middleware, route.handler)
+			await composed(ctx)
 		} catch (error) {
 			if (errorHandler) {
 				const ctx = createErrorContext('sns', record, lambdaContext)

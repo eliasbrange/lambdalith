@@ -10,14 +10,17 @@ import {
 	createNotFoundContext,
 } from '../contexts.ts'
 import type {
+	DynamoDBContext,
 	DynamoDBHandler,
 	DynamoDBOptions,
 	DynamoDBRoute,
 	ErrorHandler,
+	Middleware,
 	NotFoundHandler,
 } from '../types.ts'
 import { parseTableName } from '../utils.ts'
 import { BatchRouter } from './batch-router.ts'
+import { composeMiddleware } from './middleware.ts'
 
 export class DynamoDBRouter extends BatchRouter<DynamoDBRecord, DynamoDBRoute> {
 	add(handler: DynamoDBHandler): void
@@ -57,12 +60,14 @@ export class DynamoDBRouter extends BatchRouter<DynamoDBRecord, DynamoDBRoute> {
 		lambdaContext: LambdaContext,
 		errorHandler?: ErrorHandler,
 		notFoundHandler?: NotFoundHandler,
+		middleware: Middleware<DynamoDBContext>[] = [],
 	): Promise<BatchResponse> {
 		return this.handle(
 			event.Records,
 			lambdaContext,
 			errorHandler,
 			notFoundHandler,
+			middleware as Middleware[],
 		)
 	}
 
@@ -82,6 +87,7 @@ export class DynamoDBRouter extends BatchRouter<DynamoDBRecord, DynamoDBRoute> {
 		lambdaContext: LambdaContext,
 		errorHandler?: ErrorHandler,
 		notFoundHandler?: NotFoundHandler,
+		middleware: Middleware[] = [],
 	): Promise<void> {
 		const table = parseTableName(record.eventSourceARN)
 		const route = this.matchRoute(table)
@@ -96,7 +102,11 @@ export class DynamoDBRouter extends BatchRouter<DynamoDBRecord, DynamoDBRoute> {
 
 		try {
 			const ctx = createDynamoDBContext(record, lambdaContext)
-			await route.handler(ctx)
+			const composed = composeMiddleware(
+				middleware as Middleware<DynamoDBContext>[],
+				route.handler,
+			)
+			await composed(ctx)
 		} catch (error) {
 			if (errorHandler) {
 				const ctx = createErrorContext('dynamodb', record, lambdaContext)

@@ -71,20 +71,24 @@ export interface DynamoDBData {
 	readonly raw: DynamoDBRecord
 }
 
-// Full context types for each event source
+// Full context types for each event source (discriminated union)
 export interface SQSContext extends BaseContext {
+	readonly source: 'sqs'
 	readonly sqs: SQSData
 }
 
 export interface SNSContext extends BaseContext {
+	readonly source: 'sns'
 	readonly sns: SNSData
 }
 
 export interface EventBridgeContext extends BaseContext {
+	readonly source: 'event'
 	readonly event: EventBridgeData
 }
 
 export interface DynamoDBContext extends BaseContext {
+	readonly source: 'dynamodb'
 	readonly dynamodb: DynamoDBData
 }
 
@@ -148,6 +152,36 @@ export interface DynamoDBRoute {
 	matcher: string | undefined
 	options: DynamoDBOptions | undefined
 	handler: DynamoDBHandler
+}
+
+// Middleware types
+
+// Union context for global middleware
+export type AnyContext =
+	| SQSContext
+	| SNSContext
+	| EventBridgeContext
+	| DynamoDBContext
+
+// Next function for middleware
+export type Next = () => Promise<void>
+
+// Middleware type (generic, defaults to AnyContext for global middleware)
+export type Middleware<C = AnyContext> = (
+	c: C,
+	next: Next,
+) => void | Promise<void>
+
+// Typed middleware variants for event-specific middleware
+export type SQSMiddleware = Middleware<SQSContext>
+export type SNSMiddleware = Middleware<SNSContext>
+export type EventBridgeMiddleware = Middleware<EventBridgeContext>
+export type DynamoDBMiddleware = Middleware<DynamoDBContext>
+
+// Internal middleware entry (used by router)
+export interface MiddlewareEntry {
+	filter: EventSource | undefined
+	handler: Middleware
 }
 
 // DynamoDB AttributeValue re-export for utils
