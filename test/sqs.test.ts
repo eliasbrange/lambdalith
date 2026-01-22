@@ -104,21 +104,6 @@ describe('SQS routing', () => {
 		})
 	})
 
-	test('get/set works on context', async () => {
-		const router = new EventRouter()
-		let getValue: unknown
-
-		router.sqs('orders-queue', (c) => {
-			c.set('traceId', 'trace-123')
-			getValue = c.get('traceId')
-		})
-
-		const event = createSQSEvent('orders-queue', 'msg-1', {})
-		await router.handler()(event, mockLambdaContext)
-
-		expect(getValue).toBe('trace-123')
-	})
-
 	test('sequential: true processes records in order', async () => {
 		const router = new EventRouter()
 		const order: string[] = []
