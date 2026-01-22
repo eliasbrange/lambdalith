@@ -1,9 +1,5 @@
 import type { LambdaContext, SNSEvent } from '../aws-types.ts'
-import {
-	createErrorContext,
-	createNotFoundContext,
-	createSNSContext,
-} from '../contexts.ts'
+import { createSNSContext } from '../contexts.ts'
 import type {
 	ErrorHandler,
 	Middleware,
@@ -42,21 +38,20 @@ export class SnsRouter {
 		const topic = parseTopicName(record.Sns.TopicArn)
 		const route = this.matchRoute(topic)
 
+		const ctx = createSNSContext(record, lambdaContext)
+
 		if (!route) {
 			if (notFoundHandler) {
-				const ctx = createNotFoundContext('sns', record, lambdaContext)
 				await notFoundHandler(ctx)
 			}
 			return
 		}
 
 		try {
-			const ctx = createSNSContext(record, lambdaContext)
 			const composed = composeMiddleware(middleware, route.handler)
 			await composed(ctx)
 		} catch (error) {
 			if (errorHandler) {
-				const ctx = createErrorContext('sns', record, lambdaContext)
 				await errorHandler(error as Error, ctx)
 			}
 			throw error

@@ -4,11 +4,7 @@ import type {
 	DynamoDBStreamEvent,
 	LambdaContext,
 } from '../aws-types.ts'
-import {
-	createDynamoDBContext,
-	createErrorContext,
-	createNotFoundContext,
-} from '../contexts.ts'
+import { createDynamoDBContext } from '../contexts.ts'
 import type {
 	DynamoDBContext,
 	DynamoDBHandler,
@@ -92,16 +88,16 @@ export class DynamoDBRouter extends BatchRouter<DynamoDBRecord, DynamoDBRoute> {
 		const table = parseTableName(record.eventSourceARN)
 		const route = this.matchRoute(table)
 
+		const ctx = createDynamoDBContext(record, lambdaContext)
+
 		if (!route) {
 			if (notFoundHandler) {
-				const ctx = createNotFoundContext('dynamodb', record, lambdaContext)
 				await notFoundHandler(ctx)
 			}
 			return
 		}
 
 		try {
-			const ctx = createDynamoDBContext(record, lambdaContext)
 			const composed = composeMiddleware(
 				middleware as Middleware<DynamoDBContext>[],
 				route.handler,
@@ -109,7 +105,6 @@ export class DynamoDBRouter extends BatchRouter<DynamoDBRecord, DynamoDBRoute> {
 			await composed(ctx)
 		} catch (error) {
 			if (errorHandler) {
-				const ctx = createErrorContext('dynamodb', record, lambdaContext)
 				await errorHandler(error as Error, ctx)
 			}
 			throw error

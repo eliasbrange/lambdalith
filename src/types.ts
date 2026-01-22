@@ -13,6 +13,7 @@ export type EventSource = 'sqs' | 'sns' | 'event' | 'dynamodb'
 // Base context with shared functionality
 export interface BaseContext {
 	readonly lambda: LambdaContext
+	readonly raw: unknown
 	get<T = unknown>(key: string): T | undefined
 	set(key: string, value: unknown): void
 }
@@ -92,26 +93,24 @@ export interface DynamoDBContext extends BaseContext {
 	readonly dynamodb: DynamoDBData
 }
 
+// Union context type (discriminated union of all context types)
+export type AnyContext =
+	| SQSContext
+	| SNSContext
+	| EventBridgeContext
+	| DynamoDBContext
+
 // Handler types
 export type SQSHandler = (c: SQSContext) => void | Promise<void>
 export type SNSHandler = (c: SNSContext) => void | Promise<void>
 export type EventBridgeHandler = (c: EventBridgeContext) => void | Promise<void>
 export type DynamoDBHandler = (c: DynamoDBContext) => void | Promise<void>
 
-// Not found context
-export interface NotFoundContext extends BaseContext {
-	readonly source: EventSource
-	readonly raw: unknown
-}
-
+// NotFound and Error contexts reuse the discriminated union
+export type NotFoundContext = AnyContext
 export type NotFoundHandler = (c: NotFoundContext) => void | Promise<void>
 
-// Error context
-export interface ErrorContext extends BaseContext {
-	readonly source: EventSource
-	readonly raw: unknown
-}
-
+export type ErrorContext = AnyContext
 export type ErrorHandler = (
 	error: Error,
 	c: ErrorContext,
@@ -155,13 +154,6 @@ export interface DynamoDBRoute {
 }
 
 // Middleware types
-
-// Union context for global middleware
-export type AnyContext =
-	| SQSContext
-	| SNSContext
-	| EventBridgeContext
-	| DynamoDBContext
 
 // Next function for middleware
 export type Next = () => Promise<void>

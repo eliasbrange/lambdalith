@@ -1,9 +1,5 @@
 import type { EventBridgeEvent, LambdaContext } from '../aws-types.ts'
-import {
-	createErrorContext,
-	createEventBridgeContext,
-	createNotFoundContext,
-} from '../contexts.ts'
+import { createEventBridgeContext } from '../contexts.ts'
 import type {
 	ErrorHandler,
 	EventBridgeContext,
@@ -42,21 +38,20 @@ export class EventBridgeRouter {
 		const detailType = event['detail-type']
 		const handler = this.matchHandler(source, detailType)
 
+		const ctx = createEventBridgeContext(event, lambdaContext)
+
 		if (!handler) {
 			if (notFoundHandler) {
-				const ctx = createNotFoundContext('event', event, lambdaContext)
 				await notFoundHandler(ctx)
 			}
 			return
 		}
 
 		try {
-			const ctx = createEventBridgeContext(event, lambdaContext)
 			const composed = composeMiddleware(middleware, handler)
 			await composed(ctx)
 		} catch (error) {
 			if (errorHandler) {
-				const ctx = createErrorContext('event', event, lambdaContext)
 				await errorHandler(error as Error, ctx)
 			}
 			throw error

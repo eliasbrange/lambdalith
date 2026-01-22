@@ -4,11 +4,7 @@ import type {
 	SQSEvent,
 	SQSRecord,
 } from '../aws-types.ts'
-import {
-	createErrorContext,
-	createNotFoundContext,
-	createSQSContext,
-} from '../contexts.ts'
+import { createSQSContext } from '../contexts.ts'
 import type {
 	ErrorHandler,
 	Middleware,
@@ -86,16 +82,16 @@ export class SqsRouter extends BatchRouter<SQSRecord, SQSRoute> {
 		const queue = parseQueueName(record.eventSourceARN)
 		const route = this.matchRoute(queue)
 
+		const ctx = createSQSContext(record, lambdaContext)
+
 		if (!route) {
 			if (notFoundHandler) {
-				const ctx = createNotFoundContext('sqs', record, lambdaContext)
 				await notFoundHandler(ctx)
 			}
 			return
 		}
 
 		try {
-			const ctx = createSQSContext(record, lambdaContext)
 			const composed = composeMiddleware(
 				middleware as Middleware<SQSContext>[],
 				route.handler,
@@ -103,7 +99,6 @@ export class SqsRouter extends BatchRouter<SQSRecord, SQSRoute> {
 			await composed(ctx)
 		} catch (error) {
 			if (errorHandler) {
-				const ctx = createErrorContext('sqs', record, lambdaContext)
 				await errorHandler(error as Error, ctx)
 			}
 			throw error

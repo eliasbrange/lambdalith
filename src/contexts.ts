@@ -6,14 +6,10 @@ import type {
 	SQSRecord,
 } from './aws-types.ts'
 import type {
-	BaseContext,
 	DynamoDBContext,
 	DynamoDBData,
-	ErrorContext,
 	EventBridgeContext,
 	EventBridgeData,
-	EventSource,
-	NotFoundContext,
 	SNSContext,
 	SNSData,
 	SQSContext,
@@ -29,8 +25,9 @@ import {
 
 /**
  * Base context implementation with get/set and lambda context.
+ * Note: 'raw' is added when creating specific context types.
  */
-class BaseContextImpl implements BaseContext {
+class BaseContextImpl {
 	private store = new Map<string, unknown>()
 
 	constructor(public readonly lambda: LambdaContext) {}
@@ -185,6 +182,7 @@ export function createSQSContext(
 	const base = new BaseContextImpl(lambdaContext)
 	return Object.assign(base, {
 		source: 'sqs' as const,
+		raw: record,
 		sqs: new SQSDataImpl(record),
 	}) as SQSContext
 }
@@ -196,6 +194,7 @@ export function createSNSContext(
 	const base = new BaseContextImpl(lambdaContext)
 	return Object.assign(base, {
 		source: 'sns' as const,
+		raw: record,
 		sns: new SNSDataImpl(record),
 	}) as SNSContext
 }
@@ -207,6 +206,7 @@ export function createEventBridgeContext(
 	const base = new BaseContextImpl(lambdaContext)
 	return Object.assign(base, {
 		source: 'event' as const,
+		raw: event,
 		event: new EventBridgeDataImpl(event),
 	}) as EventBridgeContext
 }
@@ -218,30 +218,7 @@ export function createDynamoDBContext(
 	const base = new BaseContextImpl(lambdaContext)
 	return Object.assign(base, {
 		source: 'dynamodb' as const,
+		raw: record,
 		dynamodb: new DynamoDBDataImpl(record),
 	}) as DynamoDBContext
-}
-
-export function createNotFoundContext(
-	source: EventSource,
-	raw: unknown,
-	lambdaContext: LambdaContext,
-): NotFoundContext {
-	const base = new BaseContextImpl(lambdaContext)
-	return Object.assign(base, {
-		source,
-		raw,
-	}) as NotFoundContext
-}
-
-export function createErrorContext(
-	source: EventSource,
-	raw: unknown,
-	lambdaContext: LambdaContext,
-): ErrorContext {
-	const base = new BaseContextImpl(lambdaContext)
-	return Object.assign(base, {
-		source,
-		raw,
-	}) as ErrorContext
 }
