@@ -1,3 +1,4 @@
+export type { BatchResponse, LambdaContext } from './aws-types.ts'
 export { EventRouter } from './router/index.ts'
 export type {
 	AnyContext,
