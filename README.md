@@ -1,6 +1,6 @@
 # Lambdalith
 
-![Lambdalith](./assets/lambdalith.jpg)
+<img src="./assets/lambdalith.jpg" alt="Lambdalith" />
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/eliasbrange/lambdalith/ci.yml?branch=main)](https://github.com/eliasbrange/lambdalith/actions)
 [![GitHub](https://img.shields.io/github/license/eliasbrange/lambdalith)](https://github.com/eliasbrange/lambdalith/blob/main/LICENSE)
 [![npm](https://img.shields.io/npm/v/lambdalith)](https://www.npmjs.com/package/lambdalith)
