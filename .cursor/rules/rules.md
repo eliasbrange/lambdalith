@@ -37,7 +37,7 @@
 
 ## Documentation
 
-- Keep `README.md` in sync with code changes
+- Keep `README.md` and `llm.txt` in sync with code changes
 - Update examples when APIs change
 
 ## Commands
