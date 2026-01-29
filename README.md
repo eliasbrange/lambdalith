@@ -100,18 +100,25 @@ router.sqs((c) => {
 
 ## Error Handling
 
-For SQS and DynamoDB Streams, errors in a handler will not cause the Lambda function to fail. Instead, the router will respond with a `batchItemFailures` array containing the IDs of the failed records.
-
-For other types of events, errors in a handler will cause the Lambda function to fail.
+When an error handler is registered, errors are **swallowed by default**. To propagate an error (mark the record as failed or fail the invocation), rethrow it:
 
 ```typescript
-// Called when a handler throws an error
+// Swallow error (log and continue)
 router.onError((error, c) => {
   console.error(error.message);
-  console.log(c.source); // 'sqs' | 'sns' | 'event' | 'dynamodb'
-  console.log(c.raw);    // Raw event/record
 });
 
+// Propagate error (rethrow to fail)
+router.onError((error, c) => {
+  console.error(error.message);
+  throw error; // Record marked as failed / invocation fails
+});
+```
+
+If you do not register an error handler, errors always propagate to the router which will mark the record as failed.
+
+
+```typescript
 // Called when no route matches
 router.notFound((c) => {
   console.warn('Unhandled:', c.source);

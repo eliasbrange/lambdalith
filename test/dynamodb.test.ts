@@ -165,6 +165,25 @@ describe('DynamoDB Streams routing', () => {
 		const result = await router.handler()(event, mockLambdaContext)
 
 		expect(errorHandler).toHaveBeenCalledTimes(1)
+		// Error is swallowed by default when error handler is registered
+		expect(result).toEqual({ batchItemFailures: [] })
+	})
+
+	test('error handler can rethrow to mark record as failed', async () => {
+		const router = new EventRouter()
+		const errorHandler = mock((error: Error) => {
+			throw error
+		})
+
+		router.dynamodb(() => {
+			throw new Error('Test error')
+		})
+		router.onError(errorHandler)
+
+		const event = createDynamoDBEvent('any-table', 'INSERT', {})
+		const result = await router.handler()(event, mockLambdaContext)
+
+		expect(errorHandler).toHaveBeenCalledTimes(1)
 		expect(result).toEqual({
 			batchItemFailures: [{ itemIdentifier: 'test-event-id' }],
 		})

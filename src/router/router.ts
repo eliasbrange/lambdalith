@@ -156,6 +156,19 @@ export class EventRouter {
 
 	/**
 	 * Register an error handler.
+	 * Errors are swallowed by default. Rethrow to propagate.
+	 *
+	 * @example
+	 * // Swallow (log and continue)
+	 * router.onError((error, c) => {
+	 *   console.error(error)
+	 * })
+	 *
+	 * // Propagate (rethrow to fail record/invocation)
+	 * router.onError((error, c) => {
+	 *   console.error(error)
+	 *   throw error
+	 * })
 	 */
 	onError(handler: ErrorHandler): this {
 		this.errorHandler = handler

@@ -53,6 +53,7 @@ export class SnsRouter {
 		} catch (error) {
 			if (errorHandler) {
 				await errorHandler(error as Error, ctx)
+				return
 			}
 			throw error
 		}

@@ -39,11 +39,27 @@ describe('SNS routing', () => {
 		router.onError(errorHandler)
 
 		const event = createSNSEvent('notifications', 'msg-1', { alert: 'test' })
+		// Error is swallowed by default when error handler is registered
+		await router.handler()(event, mockLambdaContext)
+
+		expect(errorHandler).toHaveBeenCalledTimes(1)
+	})
+
+	test('error handler can rethrow to propagate error', async () => {
+		const router = new EventRouter()
+		const errorHandler = mock((error: Error) => {
+			throw error
+		})
+
+		router.sns(() => {
+			throw new Error('Test error')
+		})
+		router.onError(errorHandler)
+
+		const event = createSNSEvent('notifications', 'msg-1', { alert: 'test' })
 		expect(router.handler()(event, mockLambdaContext)).rejects.toThrow(
 			'Test error',
 		)
-
-		expect(errorHandler).toHaveBeenCalledTimes(1)
 	})
 
 	test('routes to not found handler when no handler is found', async () => {

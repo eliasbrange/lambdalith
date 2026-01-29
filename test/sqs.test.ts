@@ -246,6 +246,25 @@ describe('SQS routing', () => {
 		const result = await router.handler()(event, mockLambdaContext)
 
 		expect(errorHandler).toHaveBeenCalledTimes(1)
+		// Error is swallowed by default when error handler is registered
+		expect(result).toEqual({ batchItemFailures: [] })
+	})
+
+	test('error handler can rethrow to mark record as failed', async () => {
+		const router = new EventRouter()
+		const errorHandler = mock((error: Error) => {
+			throw error
+		})
+
+		router.sqs(() => {
+			throw new Error('Test error')
+		})
+		router.onError(errorHandler)
+
+		const event = createSQSEvent('any.queue', 'msg-1', { data: 'test' })
+		const result = await router.handler()(event, mockLambdaContext)
+
+		expect(errorHandler).toHaveBeenCalledTimes(1)
 		expect(result).toEqual({
 			batchItemFailures: [{ itemIdentifier: 'msg-1' }],
 		})
