@@ -68,7 +68,7 @@ export class DynamoDBRouter extends BatchRouter<DynamoDBRecord, DynamoDBRoute> {
 	}
 
 	protected getRecordId(record: DynamoDBRecord): string {
-		return record.eventID
+		return record.dynamodb.SequenceNumber
 	}
 
 	protected findRouteForRecord(

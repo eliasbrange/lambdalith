@@ -123,6 +123,7 @@ export function createDynamoDBRecord(
 	eventId: string,
 	keys: Record<string, AttributeValue>,
 	newImage?: Record<string, AttributeValue>,
+	sequenceNumber?: string,
 ): DynamoDBStreamEvent['Records'][0] {
 	return {
 		eventID: eventId,
@@ -130,7 +131,7 @@ export function createDynamoDBRecord(
 		dynamodb: {
 			Keys: keys,
 			NewImage: newImage,
-			SequenceNumber: '123',
+			SequenceNumber: sequenceNumber ?? eventId,
 			SizeBytes: 100,
 			StreamViewType: 'NEW_AND_OLD_IMAGES' as const,
 		},
