@@ -106,6 +106,7 @@ export class DynamoDBRouter extends BatchRouter<DynamoDBRecord, DynamoDBRoute> {
 		} catch (error) {
 			if (errorHandler) {
 				await errorHandler(error as Error, ctx)
+				return
 			}
 			throw error
 		}

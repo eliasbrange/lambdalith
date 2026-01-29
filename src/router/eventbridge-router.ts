@@ -53,6 +53,7 @@ export class EventBridgeRouter {
 		} catch (error) {
 			if (errorHandler) {
 				await errorHandler(error as Error, ctx)
+				return
 			}
 			throw error
 		}

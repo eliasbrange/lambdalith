@@ -100,6 +100,7 @@ export class SqsRouter extends BatchRouter<SQSRecord, SQSRoute> {
 		} catch (error) {
 			if (errorHandler) {
 				await errorHandler(error as Error, ctx)
+				return
 			}
 			throw error
 		}

@@ -326,9 +326,8 @@ describe('Middleware', () => {
 			const result = await router.handler()(event, mockLambdaContext)
 
 			expect(errorHandler).toHaveBeenCalledTimes(1)
-			expect(result).toEqual({
-				batchItemFailures: [{ itemIdentifier: 'msg-1' }],
-			})
+			// Error is swallowed by default when error handler is registered
+			expect(result).toEqual({ batchItemFailures: [] })
 		})
 
 		test('errors in handler still trigger after middleware when using next()', async () => {

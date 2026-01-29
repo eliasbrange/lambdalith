@@ -156,13 +156,18 @@ router.notFound((c) => {
 
 #### `router.onError(handler)`
 
-Register an error handler.
+Register an error handler. Errors are **swallowed by default** when an error handler is registered. To propagate an error (mark the record as failed or fail the invocation), rethrow it.
 
 ```typescript
+// Swallow error (log and continue)
 router.onError((error, c) => {
   console.error(error.message);
-  console.log(c.source); // 'sqs' | 'sns' | 'event' | 'dynamodb'
-  console.log(c.raw);    // Raw event/record
+});
+
+// Propagate error (rethrow to fail)
+router.onError((error, c) => {
+  console.error(error.message);
+  throw error; // Record marked as failed / invocation fails
 });
 ```
 
@@ -326,9 +331,13 @@ router.sqs('MyQueue.fifo', (c) => {
 
 ## Error Handling
 
-For SQS and DynamoDB Streams, errors in a handler will not cause the Lambda function to fail. Instead, the router returns a `batchItemFailures` array containing the IDs of failed records.
+When an error handler is registered, errors are **swallowed by default**. To propagate an error, rethrow it from the error handler.
 
-For SNS and EventBridge events, errors in a handler will cause the Lambda function to fail.
+**Without an error handler:** Errors always propagate.
+
+**Batch processing (SQS/DynamoDB):** Propagated errors mark records as failed via `batchItemFailures`.
+
+**SNS/EventBridge:** Propagated errors cause the Lambda invocation to fail.
 
 ## Middleware
 
@@ -419,9 +428,10 @@ router.dynamodb('users', (c) => {
   }
 });
 
-// Error handling
+// Error handling (swallows by default, rethrow to propagate)
 router.onError((error, c) => {
   console.error(`Error in ${c.source} handler:`, error.message);
+  // throw error; // Uncomment to propagate (fail record/invocation)
 });
 
 // Catch-all for unhandled events
