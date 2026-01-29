@@ -1,7 +1,7 @@
 {
 	"name": "lambdalith",
 	"description": "A tiny event router for AWS Lambda functions. Route SQS, SNS, EventBridge, and DynamoDB Streams events with a fluent API.",
-	"version": "0.1.4",
+	"version": "0.2.0",
 	"author": "Elias Brange",
 	"keywords": [
 		"aws",
