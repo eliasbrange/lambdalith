@@ -1,5 +1,10 @@
 import type { BatchResponse, LambdaContext } from '../aws-types.ts'
 import { detectEventType } from '../detection.ts'
+import {
+	createRouterTestClient,
+	type RouterTestClient,
+	type RouterTestOptions,
+} from '../testing.ts'
 import type {
 	DynamoDBHandler,
 	DynamoDBMiddleware,
@@ -233,6 +238,54 @@ export class EventRouter {
 			.map((entry) => entry.handler)
 	}
 
+	private async dispatch(
+		event: unknown,
+		context: LambdaContext,
+	): Promise<BatchResponse | undefined> {
+		const detected = detectEventType(event)
+
+		switch (detected.type) {
+			case 'sqs':
+				return this.sqsRouter.handleEvent(
+					detected.event,
+					context,
+					this.errorHandler,
+					this.notFoundHandler,
+					this.getMiddlewareFor('sqs'),
+				)
+			case 'sns':
+				await this.snsRouter.handle(
+					detected.event,
+					context,
+					this.errorHandler,
+					this.notFoundHandler,
+					this.getMiddlewareFor('sns'),
+				)
+				return undefined
+			case 'event':
+				await this.eventBridgeRouter.handle(
+					detected.event,
+					context,
+					this.errorHandler,
+					this.notFoundHandler,
+					this.getMiddlewareFor('event'),
+				)
+				return undefined
+			case 'dynamodb':
+				return this.dynamodbRouter.handleEvent(
+					detected.event,
+					context,
+					this.errorHandler,
+					this.notFoundHandler,
+					this.getMiddlewareFor('dynamodb'),
+				)
+			case 'unknown':
+				throw new Error(
+					`Unknown event type. Ensure your Lambda is configured with a supported trigger (SQS, SNS, EventBridge, DynamoDB Streams).`,
+				)
+		}
+	}
+
 	/**
 	 * Create a Lambda handler function.
 	 */
@@ -243,49 +296,25 @@ export class EventRouter {
 		return async (
 			event: unknown,
 			context: LambdaContext,
-		): Promise<BatchResponse | undefined> => {
-			const detected = detectEventType(event)
+		): Promise<BatchResponse | undefined> => this.dispatch(event, context)
+	}
 
-			switch (detected.type) {
-				case 'sqs':
-					return this.sqsRouter.handleEvent(
-						detected.event,
-						context,
-						this.errorHandler,
-						this.notFoundHandler,
-						this.getMiddlewareFor('sqs'),
-					)
-				case 'sns':
-					await this.snsRouter.handle(
-						detected.event,
-						context,
-						this.errorHandler,
-						this.notFoundHandler,
-						this.getMiddlewareFor('sns'),
-					)
-					return undefined
-				case 'event':
-					await this.eventBridgeRouter.handle(
-						detected.event,
-						context,
-						this.errorHandler,
-						this.notFoundHandler,
-						this.getMiddlewareFor('event'),
-					)
-					return undefined
-				case 'dynamodb':
-					return this.dynamodbRouter.handleEvent(
-						detected.event,
-						context,
-						this.errorHandler,
-						this.notFoundHandler,
-						this.getMiddlewareFor('dynamodb'),
-					)
-				case 'unknown':
-					throw new Error(
-						`Unknown event type. Ensure your Lambda is configured with a supported trigger (SQS, SNS, EventBridge, DynamoDB Streams).`,
-					)
-			}
-		}
+	/**
+	 * Create a testing helper that sends AWS-shaped events
+	 * through the router's normal execution path.
+	 *
+	 * @example
+	 * const test = router.test()
+	 *
+	 * await test.send.sqs({
+	 *   queue: 'orders-queue',
+	 *   body: { orderId: '123' },
+	 * })
+	 */
+	test(options?: RouterTestOptions): RouterTestClient {
+		return createRouterTestClient(
+			(event, context) => this.dispatch(event, context),
+			options,
+		)
 	}
 }

@@ -33,43 +33,41 @@ import { EventRouter } from 'lambdalith';
 const router = new EventRouter();
 
 router.sqs('MyQueue', (c) => {
-  console.log(c.sqs.body);
+	console.log(c.sqs.body);
 });
 
 router.sns('MyTopic', (c) => {
-  console.log(c.sns.body);
+	console.log(c.sns.body);
 });
 
 router.event({ source: 'MyService', detailType: 'MyEvent' }, (c) => {
-  console.log(c.event.detail);
+	console.log(c.event.detail);
 });
 
 router.dynamodb('MyTable', (c) => {
-  console.log(c.dynamodb.newImage);
+	console.log(c.dynamodb.newImage);
 });
 
 router.onError((error, c) => {
-  console.error(error.message);
+	console.error(error.message);
 });
 
 router.notFound((c) => {
-  console.warn('Unhandled', c.source);
+	console.warn('Unhandled', c.source);
 });
 
 export const handler = router.handler();
 ```
-
-
 ## Route Matching
 
 Routes are matched in registration order – the first matching route wins. Register specific routes before catch-alls:
 
 ```typescript
 router.sqs('SpecificQueue', (c) => {
-  // will match the specific queue
+	// will match the specific queue
 });
 router.sqs((c) => {
-  // will match any other queue
+	// will match any other queue
 });
 ```
 
@@ -82,9 +80,13 @@ For SQS and DynamoDB Streams, the router automatically handles partial batch fai
 **Sequential:** Records process one at a time. Stops processing on failure and marks remaining records as failed.
 
 ```typescript
-router.sqs('MyQueue.fifo', (c) => {
-  // will process messages from my-queue sequentially
-}, { sequential: true });
+router.sqs(
+	'MyQueue.fifo',
+	(c) => {
+		// will process messages from my-queue sequentially
+	},
+	{ sequential: true },
+);
 ```
 
 ## Context
@@ -93,8 +95,8 @@ Each handler receives a context object with event-specific data and the Lambda c
 
 ```typescript
 router.sqs((c) => {
-  c.sqs         // SQS context
-  c.lambda      // Lambda context
+	c.sqs; // SQS context
+	c.lambda; // Lambda context
 });
 ```
 
@@ -105,24 +107,23 @@ When an error handler is registered, errors are **swallowed by default**. To pro
 ```typescript
 // Swallow error (log and continue)
 router.onError((error, c) => {
-  console.error(error.message);
+	console.error(error.message);
 });
 
 // Propagate error (rethrow to fail)
 router.onError((error, c) => {
-  console.error(error.message);
-  throw error; // Record marked as failed / invocation fails
+	console.error(error.message);
+	throw error; // Record marked as failed / invocation fails
 });
 ```
 
 If you do not register an error handler, errors always propagate to the router which will mark the record as failed.
 
-
 ```typescript
 // Called when no route matches
 router.notFound((c) => {
-  console.warn('Unhandled:', c.source);
-  console.log(c.raw);
+	console.warn('Unhandled:', c.source);
+	console.log(c.raw);
 });
 ```
 
@@ -142,9 +143,9 @@ Add a middleware to the router:
 
 ```typescript
 router.use(async (c, next) => {
-  console.log('before');
-  await next();
-  console.log('after');
+	console.log('before');
+	await next();
+	console.log('after');
 });
 ```
 
@@ -152,8 +153,8 @@ Filter middleware by event type:
 
 ```typescript
 router.use('sqs', async (c, next) => {
-  // Only runs for SQS events
-  await next();
+	// Only runs for SQS events
+	await next();
 });
 
 router.use('sns', snsMiddleware);
@@ -162,6 +163,23 @@ router.use('dynamodb', dynamodbMiddleware);
 ```
 
 If `next()` is not called, processing auto-continues to the next middleware/handler.
+
+## Testing
+
+Use `router.test()` to send test events to the router to ensure your handlers are called correctly.
+
+```typescript
+describe('Example', () => {
+  const testRouter = router.test();
+  test('sqs routing', async () => {
+    const res = await testRouter.send.sqs({
+      queue: 'orders-queue',
+      body: { orderId: '123' },
+    });
+    expect(res).toEqual({ batchItemFailures: [] });
+  }
+})
+```
 
 ## Contributing
 
