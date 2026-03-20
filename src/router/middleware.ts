@@ -2,7 +2,8 @@ import type { Middleware } from '../types.ts'
 
 /**
  * Compose middleware into an onion-style execution chain.
- * If middleware doesn't call next(), processing auto-continues.
+ * Middleware must call next() to continue to the next middleware/handler.
+ * Returning without calling next() short-circuits successfully.
  *
  * Execution order:
  * - mw1 before -> mw2 before -> handler -> mw2 after -> mw1 after
@@ -25,18 +26,11 @@ export function composeMiddleware<C>(
 				const mw = middlewares[index]
 				if (!mw) return dispatch(index + 1)
 
-				const nextCalled = { value: false }
 				const next = async (): Promise<void> => {
-					nextCalled.value = true
 					await dispatch(index + 1)
 				}
 
 				await mw(c, next)
-
-				// Auto-continue if next() wasn't called
-				if (!nextCalled.value) {
-					await dispatch(index + 1)
-				}
 			} else {
 				// End of middleware chain, call handler
 				await handler(c)

@@ -152,6 +152,24 @@ describe('router.test()', () => {
 		expect(order).toEqual(['before', 'handler', 'after'])
 	})
 
+	test('middleware can short-circuit through the test client', async () => {
+		const router = new EventRouter()
+		const handler = mock(() => {})
+
+		router.use(async () => {
+			return
+		})
+		router.sqs(handler)
+
+		const result = await router.test().send.sqs({
+			queue: 'orders-queue',
+			body: {},
+		})
+
+		expect(handler).not.toHaveBeenCalled()
+		expect(result).toEqual({ batchItemFailures: [] })
+	})
+
 	test('triggers notFound for unmatched events', async () => {
 		const router = new EventRouter()
 		const notFoundHandler = mock(() => {})

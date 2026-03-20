@@ -183,6 +183,7 @@ export class EventRouter {
 	/**
 	 * Register middleware that runs for each record.
 	 * Middleware executes in onion order (first registered wraps last registered).
+	 * Middleware must call next() to continue; returning early short-circuits.
 	 *
 	 * @example
 	 * // Global middleware (all event types)

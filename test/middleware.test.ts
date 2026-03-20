@@ -85,14 +85,13 @@ describe('Middleware', () => {
 		})
 	})
 
-	describe('auto-continue', () => {
-		test('middleware without next() auto-continues to next middleware', async () => {
+	describe('short-circuiting', () => {
+		test('middleware without next() stops before later middleware and handler', async () => {
 			const router = new EventRouter()
 			const order: string[] = []
 
 			router.use(async () => {
 				order.push('mw1-before-only')
-				// no next() call
 			})
 
 			router.use(async (_c, next) => {
@@ -108,34 +107,34 @@ describe('Middleware', () => {
 			const event = createSQSEvent('test-queue', 'msg-1', {})
 			await router.handler()(event, mockLambdaContext)
 
-			expect(order).toEqual([
-				'mw1-before-only',
-				'mw2-before',
-				'handler',
-				'mw2-after',
-			])
+			expect(order).toEqual(['mw1-before-only'])
 		})
 
-		test('all middleware without next() still reaches handler', async () => {
+		test('middleware can short-circuit successfully in a batch', async () => {
 			const router = new EventRouter()
-			const order: string[] = []
+			const handled: string[] = []
 
-			router.use(async () => {
-				order.push('mw1')
+			router.use(async (c, next) => {
+				const ctx = c as SQSContext
+				if (ctx.sqs.messageId === 'msg-2') {
+					return
+				}
+				await next()
 			})
 
-			router.use(async () => {
-				order.push('mw2')
+			router.sqs((c) => {
+				handled.push(c.sqs.messageId)
 			})
 
-			router.sqs(() => {
-				order.push('handler')
-			})
+			const event = createSQSBatchEvent('test-queue', [
+				{ messageId: 'msg-1', body: {} },
+				{ messageId: 'msg-2', body: {} },
+				{ messageId: 'msg-3', body: {} },
+			])
+			const result = await router.handler()(event, mockLambdaContext)
 
-			const event = createSQSEvent('test-queue', 'msg-1', {})
-			await router.handler()(event, mockLambdaContext)
-
-			expect(order).toEqual(['mw1', 'mw2', 'handler'])
+			expect(handled).toEqual(['msg-1', 'msg-3'])
+			expect(result).toEqual({ batchItemFailures: [] })
 		})
 	})
 

@@ -149,6 +149,8 @@ router.use(async (c, next) => {
 });
 ```
 
+Middleware must call `next()` to continue. Returning without calling `next()` skips the rest of the middleware chain and the handler, treating the event as successfully handled.
+
 Filter middleware by event type:
 
 ```typescript
@@ -161,8 +163,6 @@ router.use('sns', snsMiddleware);
 router.use('event', eventBridgeMiddleware);
 router.use('dynamodb', dynamodbMiddleware);
 ```
-
-If `next()` is not called, processing auto-continues to the next middleware/handler.
 
 ## Testing
 
