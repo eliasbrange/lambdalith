@@ -63,16 +63,16 @@ type _ContextCompat = AssertAssignable<
 
 // Prevent unused variable warnings
 export type {
-	_SQSEventCompat,
-	_SQSRecordCompat,
+	_AttributeValueCompat,
 	_BatchResponseCompat,
+	_ContextCompat,
+	_DynamoDBRecordCompat,
+	_DynamoDBStreamEventCompat,
+	_EventBridgeEventCompat,
 	_SNSEventCompat,
 	_SNSEventRecordCompat,
 	_SNSMessageCompat,
-	_EventBridgeEventCompat,
-	_DynamoDBStreamEventCompat,
-	_DynamoDBRecordCompat,
+	_SQSEventCompat,
+	_SQSRecordCompat,
 	_StreamRecordCompat,
-	_AttributeValueCompat,
-	_ContextCompat,
 }
