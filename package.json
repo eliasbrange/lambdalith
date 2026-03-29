@@ -75,9 +75,9 @@
 		}
 	},
 	"simple-git-hooks": {
-		"pre-commit": "if [ -z \"$CI\" ]; then bun run lint && bun run typecheck; fi",
-		"commit-msg": "if [ -z \"$CI\" ]; then bunx commitlint --edit $1; fi",
-		"pre-push": "if [ -z \"$CI\" ]; then bun test; fi"
+		"pre-commit": "if [ -z \"$DEPENDABOT\" ]; then bun run lint && bun run typecheck; fi",
+		"commit-msg": "if [ -z \"$DEPENDABOT\" ]; then bunx commitlint --edit $1; fi",
+		"pre-push": "if [ -z \"$DEPENDABOT\" ]; then bun test; fi"
 	},
 	"commitlint": {
 		"extends": [
