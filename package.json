@@ -46,7 +46,6 @@
 	"scripts": {
 		"build": "bunup",
 		"dev": "bunup --watch",
-		"prepare": "if [ -z \"$DEPENDABOT_HOME\" ]; then bun simple-git-hooks; fi",
 		"lint": "biome check .",
 		"lint:fix": "biome check --write .",
 		"release": "bumpp --commit --push --tag",
