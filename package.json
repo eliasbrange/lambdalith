@@ -46,7 +46,7 @@
 	"scripts": {
 		"build": "bunup",
 		"dev": "bunup --watch",
-		"prepare": "bun simple-git-hooks",
+		"prepare": "if [ -z \"$DEPENDABOT_HOME\" ]; then bun simple-git-hooks; fi",
 		"lint": "biome check .",
 		"lint:fix": "biome check --write .",
 		"release": "bumpp --commit --push --tag",
@@ -75,9 +75,9 @@
 		}
 	},
 	"simple-git-hooks": {
-		"pre-commit": "then bun run lint && bun run typecheck",
-		"commit-msg": "then bunx commitlint --edit $1",
-		"pre-push": "then bun test"
+		"pre-commit": "bun run lint && bun run typecheck",
+		"commit-msg": "bunx commitlint --edit $1",
+		"pre-push": "bun test"
 	},
 	"commitlint": {
 		"extends": [
