@@ -3,6 +3,7 @@
 		"target": "ES2023",
 		"module": "Preserve",
 		"moduleDetection": "force",
+		"types": ["bun"],
 
 		"moduleResolution": "bundler",
 		"allowImportingTsExtensions": true,
