@@ -5,6 +5,8 @@ updates:
     schedule:
       interval: 'weekly'
     versioning-strategy: increase
+    ignore:
+      - dependency-name: '@biomejs/biome'
     groups:
       minor-and-patch:
         patterns:
