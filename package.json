@@ -46,7 +46,7 @@
 	"scripts": {
 		"build": "bunup",
 		"dev": "bunup --watch",
-		"prepare": "bun simple-git-hooks",
+		"prepare": "if [ -z \"$CI\" ]; then bun simple-git-hooks; fi",
 		"lint": "biome check .",
 		"lint:fix": "biome check --write .",
 		"release": "bumpp --commit --push --tag",
