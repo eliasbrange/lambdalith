@@ -60,7 +60,7 @@
 		"@commitlint/cli": "^20.5.0",
 		"@commitlint/config-conventional": "^20.5.0",
 		"@types/aws-lambda": "^8.10.161",
-		"@types/bun": "^1.3.12",
+		"@types/bun": "^1.3.13",
 		"bumpp": "^11.0.1",
 		"bunup": "^0.16.31",
 		"simple-git-hooks": "^2.13.1",
